@@ -1,0 +1,29 @@
+{
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "pg": "^8.20.0",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.6.0",
+    "@types/swagger-ui-express": "^4.1.8",
+    "drizzle-kit": "^0.31.10",
+    "i": "^0.3.7",
+    "nodemon": "^3.1.14",
+    "npm": "^11.12.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  },
+  "scripts": {
+    "dev": "tsx --watch ./src/app.ts",
+    "build": "tsc",
+    "start": "tsx ./src/app.ts",
+    "db:pull": "npx drizzle-kit pull"
+  }
+}

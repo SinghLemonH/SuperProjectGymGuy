@@ -1,0 +1,13 @@
+*/.DS_Store
+*/.env
+*/.env.local
+*/package-lock.json
+*/dist
+*/build
+*/coverage
+
+*/node_modules/
+
+*/*.log
+
+*/database/drizzle/meta
