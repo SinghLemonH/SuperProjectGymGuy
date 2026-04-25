@@ -5,14 +5,12 @@ import { registerUser, loginUser, refreshToken, logoutUser } from "../service/au
 // POST /api/v1/auth/register
 export const register = async (req: Request, res: Response) => {
     try {
-        // validate body ด้วย Zod
         const input = RegisterSchema.parse(req.body);
-
         const result = await registerUser(input);
-
         return res.status(201).json(result);
 
     } catch (error: any) {
+        // console.log("ERROR :", error) //เพิ่มบรรทัดนี้ชั่วคราว
         if (error.name === "ZodError") {
             return res.status(400).json({
                 error_code: "VALIDATION_ERROR",
@@ -42,6 +40,7 @@ export const login = async (req: Request, res: Response) => {
         return res.status(200).json(result);
 
     } catch (error: any) {
+         console.log("LOGIN ERROR →", error) 
         if (error.name === "ZodError") {
             return res.status(400).json({
                 error_code: "VALIDATION_ERROR",
