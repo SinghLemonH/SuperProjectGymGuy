@@ -7,6 +7,7 @@
     "express": "^5.2.1",
     "helmet": "^8.1.0",
     "hono": "^4.12.15",
+    "jsonwebtoken": "^9.0.3",
     "pg": "^8.20.0",
     "postgres": "^3.4.9",
     "zod": "^4.3.6"
@@ -15,6 +16,7 @@
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.6.0",
     "@types/pg": "^8.20.0",
     "@types/swagger-ui-express": "^4.1.8",

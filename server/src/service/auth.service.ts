@@ -1,41 +1,41 @@
-import { sign, verify } from "hono/jwt";
+import jwt from "jsonwebtoken";
 import * as bcrypt from "bcrypt";
 import { db } from "../database/supabase";
 import { users } from "../database/drizzle/schema";
 import { eq } from "drizzle-orm";
-import { RegisterInput, LoginInput} from "../models/auth.model"
+import { RegisterInput, LoginInput } from "../models/auth.model";
 
-const SALT_ROUND = 10; //for hash
-const ACCESS_TOKEN_EXP = 60 * 15; // 15 min (second)
-const REFRESH_TOKEN_EXP = 60 * 60 * 24 * 7 // 7days (second)
+const SALT_ROUND = 10;
+const ACCESS_TOKEN_EXP  = 60 * 15;
+const REFRESH_TOKEN_EXP = 60 * 60 * 24 * 7;
 
 //create JWT
-const generateTokens = async (userId: string) => {
-    const now = Math.floor(Date.now() / 1000) //tran current time to second
-    
-    const access_token = await sign(
-        { sub: userId, exp: now + ACCESS_TOKEN_EXP},
-        process.env.JWT_SECRET!, "HS256"
+const generateTokens = (userId: string) => {
+    const access_token = jwt.sign(
+        { sub: userId },
+        process.env.JWT_SECRET!,
+        { expiresIn: ACCESS_TOKEN_EXP }
     );
-
-    const refresh_token = await sign(
-        { sub: userId, exp: now + REFRESH_TOKEN_EXP},
-        process.env.JWT_SECRET!, "HS256"
+    const refresh_token = jwt.sign(
+        { sub: userId },
+        process.env.JWT_SECRET!,
+        { expiresIn: REFRESH_TOKEN_EXP }
     );
-
-    return { access_token, refresh_token};
-}
+    return { access_token, refresh_token };
+};
 
 //Register Logic
 export const registerUser = async (input: RegisterInput) => {
-    
+
     //check duplicate email and username
-    const existingEmail = await db.select().from(users).where(eq(users.email, input.email)).limit(1);
+    const existingEmail = await db.select().from(users)
+        .where(eq(users.email, input.email)).limit(1);
     if (existingEmail.length > 0) {
         throw { status: 409, error_code: "CONFLICT", message: "Email already exists" };
     }
 
-    const existingUsername = await db.select().from(users).where(eq(users.username, input.username)).limit(1);
+    const existingUsername = await db.select().from(users)
+        .where(eq(users.username, input.username)).limit(1);
     if (existingUsername.length > 0) {
         throw { status: 409, error_code: "CONFLICT", message: "Username already exists" };
     }
@@ -43,33 +43,25 @@ export const registerUser = async (input: RegisterInput) => {
     //hash password before stored
     const hashedPassword = await bcrypt.hash(input.password, SALT_ROUND);
 
-    //cal BMR (Thm : Mifflin-St Jeor)
+    //cal BMR (Mifflin-St Jeor)
     const bmr = input.sex === "male"
-        ? Math.round(10 * input.weight + 6.25 * input.height - 5 * input.age + 5) //male
-        : Math.round(10 * input.weight + 6.25 * input.height - 5 * input.age - 161); //female
-
-    // let bmr;
-    // if (input.sex === "male") {
-    //     bmr = Math.round(10 * input.weight + 6.25 * input.height - 5 * input.age + 5)
-    // } else {
-    //     bmr = Math.round(10 * input.weight + 6.25 * input.height - 5 * input.age - 161)
-    // }
+        ? Math.round(10 * input.weight + 6.25 * input.height - 5 * input.age + 5)
+        : Math.round(10 * input.weight + 6.25 * input.height - 5 * input.age - 161);
 
     //insert user to db
-    const  [newUser] = await db.insert(users).values({
-        username:     input.username,
-        email:        input.email,
-        password:     hashedPassword,
+    const [newUser] = await db.insert(users).values({
+        username:    input.username,
+        email:       input.email,
+        password:    hashedPassword,
         fitnessGoal: input.fitness_goal,
-        sex:          input.sex,
-        age:          input.age,
-        weight:       input.weight,
-        height:       input.height,
-        bmr:          bmr,
+        sex:         input.sex,
+        age:         input.age,
+        weight:      input.weight,
+        height:      input.height,
+        bmr:         bmr,
     }).returning();
 
-    //create JWT 
-    const tokens = await generateTokens(newUser.id);
+    const tokens = generateTokens(newUser.id);
 
     return {
         ...tokens,
@@ -85,56 +77,49 @@ export const registerUser = async (input: RegisterInput) => {
 
 //Login Logic
 export const loginUser = async (input: LoginInput) => {
-    //find user from email
-    const [user] = await db.select().from(users).where(eq(users.email, input.email)).limit(1);
 
-    if(!user) {
-        throw { status: 401, error_code: "UNAUTHORIZED", message: "Invalid email or password"};
+    const [user] = await db.select().from(users)
+        .where(eq(users.email, input.email)).limit(1);
+    if (!user) {
+        throw { status: 401, error_code: "UNAUTHORIZED", message: "Invalid email or password" };
     }
 
-    //check password with hash in db
     const isMatch = await bcrypt.compare(input.password, user.password);
     if (!isMatch) {
         throw { status: 401, error_code: "UNAUTHORIZED", message: "Invalid email or password" };
     }
 
-    const tokens = await generateTokens(user.id);
+    const tokens = generateTokens(user.id);
 
     return {
-        ...tokens, 
+        ...tokens,
         user: {
             id:           user.id,
             username:     user.username,
             email:        user.email,
             bmr:          user.bmr,
             member_since: user.memberSince,
-
         }
     };
-
 };
 
 //Refresh Token
 export const refreshToken = async (token: string) => {
-     try {
-        //verify refresh token
-        const payload = await verify(token, process.env.JWT_SECRET!, "HS256");
-
-        //release new access_token
-        const now = Math.floor(Date.now() / 1000);
-        const access_token = await sign(
-            { sub: payload.sub, exp: now + ACCESS_TOKEN_EXP },
-            process.env.JWT_SECRET!, "HS256"
+    try {
+        const payload = jwt.verify(token, process.env.JWT_SECRET!);
+        const access_token = jwt.sign(
+            { sub: (payload as any).sub },
+            process.env.JWT_SECRET!,
+            { expiresIn: ACCESS_TOKEN_EXP }
         );
-
         return { access_token };
 
     } catch {
         throw { status: 401, error_code: "UNAUTHORIZED", message: "Invalid or expired token" };
     }
-}
+};
 
-//Logout 
+//Logout
 export const logoutUser = async () => {
-    return { message: "Logged out successfully" }; //client will do itself
-}
+    return { message: "Logged out successfully" };
+};

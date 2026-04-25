@@ -1,100 +1,105 @@
-import { Context } from "hono";
+import { Request, Response } from "express";
 import { RegisterSchema, LoginSchema, RefreshSchema } from "../models/auth.model";
 import { registerUser, loginUser, refreshToken, logoutUser } from "../service/auth.service";
 
 // POST /api/v1/auth/register
-export const register = async (c: Context) => {
+export const register = async (req: Request, res: Response) => {
     try {
-        // validate request body ด้วย Zod
-        const body = await c.req.json();
-        const input = RegisterSchema.parse(body);
+        // validate body ด้วย Zod
+        const input = RegisterSchema.parse(req.body);
 
-        // เรียก service
         const result = await registerUser(input);
 
-        return c.json(result, 201);
+        return res.status(201).json(result);
 
     } catch (error: any) {
-        // Zod validation error
         if (error.name === "ZodError") {
-            return c.json({
+            return res.status(400).json({
                 error_code: "VALIDATION_ERROR",
                 message: error.errors
-            }, 400);
+            });
         }
-        // Service error (409, 401 ฯลฯ)
         if (error.status) {
-            return c.json({
+            return res.status(error.status).json({
                 error_code: error.error_code,
                 message: error.message
-            }, error.status);
+            });
         }
-        // Unexpected error
-        return c.json({ error_code: "SERVER_ERROR", message: "Internal server error" }, 500);
+        return res.status(500).json({
+            error_code: "SERVER_ERROR",
+            message: "Internal server error"
+        });
     }
 };
 
 // POST /api/v1/auth/login
-export const login = async (c: Context) => {
+export const login = async (req: Request, res: Response) => {
     try {
-        const body = await c.req.json();
-        const input = LoginSchema.parse(body);
+        const input = LoginSchema.parse(req.body);
 
         const result = await loginUser(input);
 
-        return c.json(result, 200);
+        return res.status(200).json(result);
 
     } catch (error: any) {
         if (error.name === "ZodError") {
-            return c.json({
+            return res.status(400).json({
                 error_code: "VALIDATION_ERROR",
                 message: error.errors
-            }, 400);
+            });
         }
         if (error.status) {
-            return c.json({
+            return res.status(error.status).json({
                 error_code: error.error_code,
                 message: error.message
-            }, error.status);
+            });
         }
-        return c.json({ error_code: "SERVER_ERROR", message: "Internal server error" }, 500);
+        return res.status(500).json({
+            error_code: "SERVER_ERROR",
+            message: "Internal server error"
+        });
     }
 };
 
 // POST /api/v1/auth/refresh
-export const refresh = async (c: Context) => {
+export const refresh = async (req: Request, res: Response) => {
     try {
-        const body = await c.req.json();
-        const input = RefreshSchema.parse(body);
+        const input = RefreshSchema.parse(req.body);
 
         const result = await refreshToken(input.refresh_token);
 
-        return c.json(result, 200);
+        return res.status(200).json(result);
 
     } catch (error: any) {
         if (error.name === "ZodError") {
-            return c.json({
+            return res.status(400).json({
                 error_code: "VALIDATION_ERROR",
                 message: error.errors
-            }, 400);
+            });
         }
         if (error.status) {
-            return c.json({
+            return res.status(error.status).json({
                 error_code: error.error_code,
                 message: error.message
-            }, error.status);
+            });
         }
-        return c.json({ error_code: "SERVER_ERROR", message: "Internal server error" }, 500);
+        return res.status(500).json({
+            error_code: "SERVER_ERROR",
+            message: "Internal server error"
+        });
     }
 };
 
 // POST /api/v1/auth/logout
-export const logout = async (c: Context) => {
+export const logout = async (req: Request, res: Response) => {
     try {
         const result = await logoutUser();
-        return c.json(result, 200);
+        return res.status(200).json(result);
 
     } catch (error: any) {
-        return c.json({ error_code: "SERVER_ERROR", message: "Internal server error" }, 500);
+        return res.status(500).json({
+            error_code: "SERVER_ERROR",
+            message: "Internal server error"
+        });
     }
 };
