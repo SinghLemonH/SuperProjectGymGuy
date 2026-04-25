@@ -5,11 +5,11 @@ import { authMiddleware } from "../middleware/auth.middleware";
 const router = Router();
 
 // ไม่ต้องการ auth
-router.post("/auth/register", register);
-router.post("/auth/login",    login);
-router.post("/auth/refresh",  refresh);
+router.post("/register", register);
+router.post("/login",    login);
+router.post("/refresh",  refresh);
 
 // ต้องการ auth
-router.post("/auth/logout", authMiddleware, logout);
+router.post("/logout", authMiddleware, logout);
 
 export default router;

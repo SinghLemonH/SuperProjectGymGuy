@@ -1,4 +1,7 @@
 import express from "express";
+import dotenv from "dotenv";
+dotenv.config({ path: ".env.local" });
+
 import { testconn } from "./database/supabase";
 import authRoutes from "./routes/auth.routes";
 
@@ -8,7 +11,7 @@ const app = express();
 app.use(express.json()); // parse JSON body
 
 // ─── Routes ────────────────────────────────────────────────────────
-app.use("/api/v1", authRoutes);
+app.use("/api/v1/auth", authRoutes);
 
 // ─── Start Server ──────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
