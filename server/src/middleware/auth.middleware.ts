@@ -17,7 +17,7 @@ export const authMiddleware = async (c: Context, next: Next) => {
 
     //verify token expired or not
     try {
-        const payload = await verify(token, process.env.JWT_SECRET!);
+        const payload = await verify(token, process.env.JWT_SECRET!, "HS256");
         
         c.set("userId", payload.sub); //for controller calling
 
