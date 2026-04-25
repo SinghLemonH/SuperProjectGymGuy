@@ -1,6 +1,7 @@
 import express from "express";
 import { testconn } from "./database/supabase";
 import authRoutes from "./routes/auth.routes";
+import workoutSessionRoutes from "./routes/WorkoutSession.route";
 
 const app = express();
 
@@ -9,6 +10,7 @@ app.use(express.json()); // parse JSON body
 
 // ─── Routes ────────────────────────────────────────────────────────
 app.use("/api/v1", authRoutes);
+app.use("/api/v1", workoutSessionRoutes);
 
 // ─── Start Server ──────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
