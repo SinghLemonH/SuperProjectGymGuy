@@ -182,10 +182,9 @@ export const deleteUser = async (id: string) => {
         throw { status: 404, error_code: "NOT_FOUND", message: "User not found" };
     }
 
-    //soft delete: set is_active = false
+    
     await db.execute(sql`
-        UPDATE users SET is_active = false
-        WHERE id = ${id}
+        DELETE FROM users WHERE id = ${id}
     `);
 
     return { message: "User deleted successfully" };
