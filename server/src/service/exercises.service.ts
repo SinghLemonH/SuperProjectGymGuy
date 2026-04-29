@@ -1,5 +1,5 @@
 import { db } from "../database/supabase";
-import { exercise, exerciseMuscleAff, workoutPlanExercise, workoutSessionExercise } from "../database/drizzle/schema";
+import { exercise as exerciseTable } from "../database/drizzle/schema";
 import { eq, inArray, or, sql } from "drizzle-orm";
 import {
   CreateExerciseInput,
@@ -19,52 +19,66 @@ function buildMuscleMap(rows: Array<{ id: string; exerciseId: string; name: stri
 }
 
 export async function listExercises(query: ExerciseQueryInput): Promise<{ data: ExerciseResponse[]; page: number; limit: number }> {
-  let baseQuery = db.select().from(exercise);
+  const conditions: any[] = [];
 
   if (query.category) {
-    baseQuery = baseQuery.where(eq(exercise.category, query.category));
+    conditions.push(sql`category = ${query.category}`);
   }
 
   if (query.difficulty_level) {
-    baseQuery = baseQuery.where(eq(exercise.difficultyLevel, query.difficulty_level));
+    conditions.push(sql`difficulty_level = ${query.difficulty_level}`);
   }
 
   if (query.search) {
     const pattern = `%${query.search.toLowerCase()}%`;
-    baseQuery = baseQuery.where(
-      or(
-        sql`LOWER(${exercise.name}) LIKE ${pattern}`,
-        sql`LOWER(${exercise.code}) LIKE ${pattern}`
-      )
-    );
+    conditions.push(sql`(LOWER(name) LIKE ${pattern} OR LOWER(code) LIKE ${pattern})`);
   }
 
+  let exerciseIds: string[] = [];
   if (query.muscle) {
-    const ids = await db.select({ exerciseId: exerciseMuscleAff.exerciseId }).from(exerciseMuscleAff).where(eq(exerciseMuscleAff.name, query.muscle));
-    const exerciseIds = ids.map((row) => row.exerciseId);
+    const querySql = sql`SELECT exercise_id FROM exercise_muscle_aff WHERE name = ${query.muscle}`;
+    const result = await db.execute((querySql as any));
+    exerciseIds = (result as any).rows.map((row: any) => row.exercise_id);
     if (exerciseIds.length === 0) {
       return { data: [], page: query.page, limit: query.limit };
     }
-    baseQuery = baseQuery.where(inArray(exercise.id, exerciseIds));
+    const inClause = sql.join(exerciseIds.map(id => sql`${id}`), sql`, `);
+    conditions.push(sql`id IN (${inClause})`);
   }
 
-  const exercises = await baseQuery.limit(query.limit).offset((query.page - 1) * query.limit);
-  const exerciseIds = exercises.map((row) => row.id);
+  const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
 
-  const muscleRows = exerciseIds.length > 0
-    ? await db.select().from(exerciseMuscleAff).where(inArray(exerciseMuscleAff.exerciseId, exerciseIds))
-    : [];
+  const querySql = sql`
+    SELECT id, code, name, category, difficulty_level, calorie_rate, score_based, description
+    FROM exercise
+    ${whereClause}
+    LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
+  `;
+  const result = await db.execute((querySql as any));
+  const exercises = (result as any).rows;
+
+  const exerciseIdsFromResult = exercises.map((row: any) => row.id);
+
+  const muscleQuerySql = sql`
+    SELECT id, exercise_id, name, impact_level
+    FROM exercise_muscle_aff
+    WHERE exercise_id IN (${sql.join(exerciseIdsFromResult.map((id: string) => sql`${id}`), sql`, `)})
+  `;
+  const muscleResult = exerciseIdsFromResult.length > 0
+    ? await db.execute((muscleQuerySql as any))
+    : { rows: [] };
+  const muscleRows = (muscleResult as any).rows;
 
   const muscleMap = buildMuscleMap(muscleRows as Array<{ id: string; exerciseId: string; name: string; impactLevel: string }>);
 
-  const data: ExerciseResponse[] = exercises.map((row) => ({
+  const data: ExerciseResponse[] = exercises.map((row: any) => ({
     id: row.id,
     code: row.code,
     name: row.name,
     category: row.category,
-    difficulty_level: row.difficultyLevel,
-    calorie_rate: row.calorieRate,
-    score_based: row.scoreBased,
+    difficulty_level: row.difficulty_level,
+    calorie_rate: row.calorie_rate,
+    score_based: row.score_based,
     description: row.description ?? null,
     muscle_mapping: muscleMap[row.id] ?? [],
   }));
@@ -73,16 +87,35 @@ export async function listExercises(query: ExerciseQueryInput): Promise<{ data: 
 }
 
 export async function getExerciseById(id: string): Promise<ExerciseResponse | null> {
-  const [row] = await db.select().from(exercise).where(eq(exercise.id, id));
-  if (!row) {
+  console.log("getExerciseById id:", id);
+  const querySql = sql`
+    SELECT id, code, name, category, difficulty_level, calorie_rate, score_based, description
+    FROM ${exerciseTable}
+    WHERE id = ${id}
+  `;
+  console.log("querySql.sql:", (querySql as any).sql);
+  console.log("querySql.params:", (querySql as any).params);
+  const result = await  db.execute((querySql as any));
+  const rows = (result as any).rows;
+
+  if (rows.length === 0) {
     return null;
   }
 
-  const muscleRows = await db.select().from(exerciseMuscleAff).where(eq(exerciseMuscleAff.exerciseId, id));
-  const muscle_mapping = (muscleRows as Array<{ id: string; name: string; impactLevel: string }>).map((muscle) => ({
+  const row = rows[0];
+
+  const muscleQuerySql = sql`
+    SELECT id, name, impact_level
+    FROM exercise_muscle_aff
+    WHERE exercise_id = ${id}
+  `;
+  const muscleResult = await db.execute((muscleQuerySql as any));
+  const muscleRows = (muscleResult as any).rows;
+
+  const muscle_mapping = muscleRows.map((muscle: any) => ({
     id: muscle.id,
     muscle: muscle.name as MuscleResponse["muscle"],
-    impact_level: muscle.impactLevel as MuscleResponse["impact_level"],
+    impact_level: muscle.impact_level as MuscleResponse["impact_level"],
   }));
 
   return {
@@ -90,78 +123,133 @@ export async function getExerciseById(id: string): Promise<ExerciseResponse | nu
     code: row.code,
     name: row.name,
     category: row.category,
-    difficulty_level: row.difficultyLevel,
-    calorie_rate: row.calorieRate,
-    score_based: row.scoreBased,
+    difficulty_level: row.difficulty_level,
+    calorie_rate: row.calorie_rate,
+    score_based: row.score_based,
     description: row.description ?? null,
     muscle_mapping,
   };
 }
 
-export async function createExercise(payload: CreateExerciseInput): Promise<ExerciseResponse> {
-  const [created] = await db.insert(exercise).values({
-    code: payload.code,
-    name: payload.name,
-    category: payload.category,
-    difficultyLevel: payload.difficulty_level,
-    calorieRate: payload.calorie_rate,
-    scoreBased: payload.score_based,
-    description: payload.description,
-  }).returning({ id: exercise.id });
+export async function createExercise(payload: CreateExerciseInput) {
+  const description =
+    payload.description && payload.description.trim() !== ""
+      ? payload.description
+      : null;
 
+  const insertSql = sql`
+    INSERT INTO exercise (
+      code, name, category, difficulty_level,
+      calorie_rate, score_based, description
+    )
+    VALUES (
+      ${payload.code},
+      ${payload.name},
+      ${payload.category},
+      ${payload.difficulty_level},
+      ${payload.calorie_rate},
+      ${payload.score_based},
+      ${description}
+    )
+    RETURNING id
+  `;
+
+  const result = await db.execute(insertSql as any);
+
+  const created = (result as any).rows[0];
   if (!created?.id) {
     throw new Error("Failed to create exercise");
   }
 
-  const muscleRows = payload.muscle_mapping.map((mapping) => ({
-    exerciseId: created.id,
-    name: mapping.muscle,
-    impactLevel: mapping.impact_level,
-  }));
+  const muscleValues = sql.join(
+    payload.muscle_mapping.map((mapping) =>
+      sql`(${created.id}, ${mapping.muscle}, ${mapping.impact_level})`
+    ),
+    sql`, `
+  );
 
-  await db.insert(exerciseMuscleAff).values(muscleRows);
-  return getExerciseById(created.id) as Promise<ExerciseResponse>;
+  const muscleInsertSql = sql`
+    INSERT INTO exercise_muscle_aff (
+      exercise_id, name, impact_level
+    )
+    VALUES ${muscleValues}
+  `;
+
+  await db.execute(muscleInsertSql as any);
+
+  return await getExerciseById(created.id);
 }
 
-export async function patchExercise(id: string, payload: PatchExerciseInput): Promise<ExerciseResponse | null> {
-  const updatePayload: Record<string, unknown> = {};
+export async function patchExercise(
+  id: string,
+  payload: PatchExerciseInput
+): Promise<ExerciseResponse | null> {
+  const updates: string[] = [];
+  const values: any[] = [];
 
-  if (payload.code !== undefined) updatePayload.code = payload.code;
-  if (payload.name !== undefined) updatePayload.name = payload.name;
-  if (payload.category !== undefined) updatePayload.category = payload.category;
-  if (payload.difficulty_level !== undefined) updatePayload.difficultyLevel = payload.difficulty_level;
-  if (payload.calorie_rate !== undefined) updatePayload.calorieRate = payload.calorie_rate;
-  if (payload.score_based !== undefined) updatePayload.scoreBased = payload.score_based;
-  if (payload.description !== undefined) updatePayload.description = payload.description;
-
-  if (Object.keys(updatePayload).length > 0) {
-    await db.update(exercise).set(updatePayload).where(eq(exercise.id, id));
+  if (payload.code !== undefined) {
+    updates.push("code = $" + (values.length + 1));
+    values.push(payload.code);
   }
 
-  if (payload.muscle_mapping !== undefined) {
-    await db.delete(exerciseMuscleAff).where(eq(exerciseMuscleAff.exerciseId, id));
-    const muscleRows = payload.muscle_mapping.map((mapping) => ({
-      exerciseId: id,
-      name: mapping.muscle,
-      impactLevel: mapping.impact_level,
-    }));
-    await db.insert(exerciseMuscleAff).values(muscleRows);
+  if (payload.name !== undefined) {
+    updates.push("name = $" + (values.length + 1));
+    values.push(payload.name);
   }
 
-  return getExerciseById(id);
+  if (payload.category !== undefined) {
+    updates.push("category = $" + (values.length + 1));
+    values.push(payload.category);
+  }
+
+  if (payload.difficulty_level !== undefined) {
+    updates.push("difficulty_level = $" + (values.length + 1));
+    values.push(payload.difficulty_level);
+  }
+
+  if (payload.calorie_rate !== undefined) {
+    updates.push("calorie_rate = $" + (values.length + 1));
+    values.push(payload.calorie_rate);
+  }
+
+  if (payload.score_based !== undefined) {
+    updates.push("score_based = $" + (values.length + 1));
+    values.push(payload.score_based);
+  }
+
+  if (payload.description !== undefined) {
+    updates.push("description = $" + (values.length + 1));
+    values.push(payload.description);
+  }
+
+  if (updates.length > 0) {
+    const query = `
+      UPDATE exercise
+      SET ${updates.join(", ")}
+      WHERE id = $${values.length + 1}
+    `;
+
+    await db.$client.query(query, [...values, id]);
+  }
+
+  return await getExerciseById(id);
 }
 
 export async function deleteExercise(id: string): Promise<void> {
-  const planRef = await db.select().from(workoutPlanExercise).where(eq(workoutPlanExercise.exerciseId, id)).limit(1);
-  if (planRef.length > 0) {
+  const planQuerySql = sql`SELECT 1 FROM workout_plan_exercise WHERE exercise_id = ${id} LIMIT 1`;
+  const planResult = await db.execute(planQuerySql as any);
+  if ((planResult as any).rows.length > 0) {
     throw new Error("Cannot delete exercise because it is used in a workout plan");
   }
 
-  const sessionRef = await db.select().from(workoutSessionExercise).where(eq(workoutSessionExercise.exerciseId, id)).limit(1);
-  if (sessionRef.length > 0) {
+  const sessionQuerySql = sql`SELECT 1 FROM workout_session_exercise WHERE exercise_id = ${id} LIMIT 1`;
+  const sessionResult = await db.execute(sessionQuerySql as any);
+  if ((sessionResult as any).rows.length > 0) {
     throw new Error("Cannot delete exercise because it is used in a workout session");
   }
 
-  await db.delete(exerciseMuscleAff).where(eq(exerciseMuscleAff.exerciseId, id));
-  await db.delete(exercise).where(eq(exercise.id, id));
+  const deleteMuscleSql = sql`DELETE FROM exercise_muscle_aff WHERE exercise_id = ${id}`;
+  await db.execute(deleteMuscleSql as any);
+  const deleteExerciseSql = sql`DELETE FROM exercise WHERE id = ${id}`;
+  await db.execute(deleteExerciseSql as any);
 }

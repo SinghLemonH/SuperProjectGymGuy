@@ -11,6 +11,7 @@ const app = express();
 app.use(express.json()); // parse JSON body
 
 // ─── Routes ────────────────────────────────────────────────────────
+console.log("DATABASE_URL:", process.env.DATABASE_URL);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/exercises", exercisesRoutes);
 app.use("/api/v1/muscles", musclesRoutes);

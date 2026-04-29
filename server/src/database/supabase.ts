@@ -7,6 +7,8 @@ dotenv.config({ path: ".env.local"})
 
 const dbUrl = process.env.DATABASE_URL
 
+console.log("dbUrl:", dbUrl)
+
 const pool = new Pool({
     connectionString: dbUrl,
 });
