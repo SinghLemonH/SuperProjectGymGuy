@@ -139,6 +139,7 @@ export const workoutPlanExercise = pgTable("workout_plan_exercise", {
 	scoreOverride: numeric("score_override").default('0').notNull(),
 	note: text(),
 	targetWeight: smallint("target_weight"),
+	dateNumber: smallint("date_number").default(sql`'1'`),
 }, (table) => [
 	foreignKey({
 			columns: [table.exerciseId],
