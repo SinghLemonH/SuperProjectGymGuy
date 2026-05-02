@@ -13,7 +13,7 @@ function isUUID(value: string): boolean {
 
 // type of line item function 
 interface LineItemInput {
-  exercise_code: string;
+  exercise_id: string;
   target_sets: number;
   target_reps?: number;
   target_duration?: number;
@@ -75,11 +75,10 @@ export async function listWorkoutPlan({
         WHERE plan_name ILIKE ${searchParam} OR code ILIKE ${searchParam}
         ORDER BY ${sql.raw(`${sortColumn} ${sortDirection}`)}
         LIMIT ${Number(limit)} OFFSET ${offset}`);
-    const countResult = await db.execute(sql`
+        const countResult = await db.execute(sql`
       SELECT COUNT(*) as total
-      FROM workout_plan w
-      JOIN users u ON u.id = w.user_id
-      WHERE w.code ILIKE ${searchParam} OR u.username ILIKE ${searchParam}
+      FROM workout_plan
+      WHERE plan_name ILIKE ${searchParam} OR code ILIKE ${searchParam}
     `);
   const total = Number(countResult.rows[0].total);
 
@@ -94,7 +93,7 @@ export async function listWorkoutPlan({
 
 
 /** Resolve workout_plan to id (for internal use). */
-async function resolveWorkoutPlanId(work_out_plan_code : string) {
+export async function resolveWorkoutPlanId(work_out_plan_code : string) {
   const r = await db.execute(sql`SELECT id FROM workout_plan WHERE code = ${work_out_plan_code}`);
   return r.rows.length > 0 ? String(r.rows[0].id) : null;
 }
@@ -150,31 +149,6 @@ export async function getWorkoutPlan(idOrCode : string) {
   };
 }
 
-// enrich score override to line items
-export async function enrichLineItem(client: PoolClient, line_items: LineItemInput[]) {
-  const enriched: any[] = [];
-
-  for (const li of line_items) {
-    const exerciseCode = li.exercise_code?.trim();
-    if (!exerciseCode) throw new Error("Line item missing exercise_code");
-
-    const ex = await client.query(
-      `SELECT id, score_based FROM exercise WHERE code = $1`,
-      [exerciseCode]
-    );
-
-    if (ex.rows.length === 0) throw new Error(`Exercise not found: ${exerciseCode}`);
-
-    enriched.push({
-      ...li,
-      exercise_id: ex.rows[0].id,
-      score_override: ex.rows[0].score_based,
-    });
-  }
-
-  return enriched;
-}
-
 async function calculateDifficulty(client : PoolClient, workout_plan_id : string) : Promise<Number>{
   const plan_difficulty = await client.query(
   `SELECT AVG(e.difficulty_level) AS difficulty
@@ -187,7 +161,6 @@ async function calculateDifficulty(client : PoolClient, workout_plan_id : string
 
 export async function createWorkOutPlan(input: CreateWorkOutPlanInput) {
 
-  const { plan_code, plan_name, user_id, description, start_date, end_date, line_items } = input;
   const client = await pool.connect();
 
   try {
@@ -196,33 +169,29 @@ export async function createWorkOutPlan(input: CreateWorkOutPlanInput) {
 
     // 2. Insert workout plan header
     const planResult = await client.query(
-      `INSERT INTO workout_plan (code, plan_name, user_id, start_date, end_date, description)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO workout_plan (code, plan_name, user_id, start_date, end_date, description, completeness)
+       VALUES ($1, $2, $3, $4, $5, $6, 0)
        RETURNING id, code, plan_name`,
-      [plan_code, plan_name, user_id, start_date, end_date, description]
+      [input.plan_code, input.plan_name, input.user_id, input.start_date, input.end_date, input.description]
     );
 
     const planId = planResult.rows[0].id;
 
-    // 3. Enrich and insert line items
-    const enriched = await enrichLineItem(client, line_items);
-
-    for (const li of enriched) {
-      await client.query(
-        `INSERT INTO workout_plan_exercise (workout_plan_id, exercise_id, target_sets, target_reps, target_duration, target_weight, score_override, note)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [
-          planId,
-          li.exercise_id,
-          li.target_sets,
-          li.target_reps,
-          li.target_duration,
-          li.target_weight,
-          li.score_override,
-          li.note
-        ]
-      );
-    }
+        for (const li of input.line_items) {
+          await client.query(
+            `INSERT INTO workout_plan_exercise (workout_plan_id, exercise_id, target_sets, target_reps, target_duration, target_weight, note)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              planId,
+              li.exercise_id,
+              li.target_sets,
+              li.target_reps ?? null,
+              li.target_duration ?? null,
+              li.target_weight ?? null,
+              li.note ?? null
+            ]
+          );
+        }
 
     // Update difficulty 
     const difficulty = await calculateDifficulty(client, planId)
@@ -275,27 +244,23 @@ export async function updateWorkOutPlan(input: UpdateWorkOutPlanInput) {
         values
       );
     }
-        // Update line items if provided
-    if (input.line_items && input.line_items.length > 0) {
+      // Update line items if provided
+      if (input.line_items && input.line_items.length > 0) {
       // Delete existing line items
-      await client.query(`DELETE FROM workout_plan_exercise WHERE workout_plan_id = $1`, [id]);
+        await client.query(`DELETE FROM workout_plan_exercise WHERE workout_plan_id = $1`, [id]);
 
-      // Enrich and insert new line items
-      const enriched = await enrichLineItem(client, input.line_items);
-
-      for (const li of enriched) {
-        await client.query(
-          `INSERT INTO workout_plan_exercise (workout_plan_id, exercise_id, target_sets, target_reps, target_duration, target_weight, score_override, note)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [id, li.exercise_id, li.target_sets, li.target_reps, li.target_duration, li.target_weight, li.score_override, li.note]
-        );
-      }
+        for (const li of input.line_items) {
+          await client.query(
+            `INSERT INTO workout_plan_exercise (workout_plan_id, exercise_id, target_sets, target_reps, target_duration, target_weight, note)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [id, li.exercise_id, li.target_sets, li.target_reps ?? null, li.target_duration ?? null, li.target_weight ?? null, li.note ?? null]
+          );
+        }
     }
 
     // Update difficulty 
     const difficulty = await calculateDifficulty(client, id);
     await client.query('UPDATE workout_plan SET difficulty = $1 WHERE id = $2', [difficulty, id]);
-
 
     await client.query("COMMIT");
     return { success: true };

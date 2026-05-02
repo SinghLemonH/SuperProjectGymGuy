@@ -18,7 +18,7 @@ export const CreateWorkOutPlanBodySchema = z.object({
   description: z.string().optional(),
   line_items: z.array(
       z.object({
-        exercise_code: z.string(),
+        exercise_id: z.string(),
         target_sets: z.coerce.number().int(),
         target_reps: z.coerce.number().int().optional(),
         target_duration: z.coerce.number().int().optional(),
@@ -36,7 +36,7 @@ export const UpdateWorkOutPlanBodySchema = z.object({
   description: z.string().optional(),
   line_items: z.array(
       z.object({
-        exercise_code: z.string(),
+        exercise_id: z.string(),
         target_sets: z.coerce.number().int(),
         target_reps: z.coerce.number().int().optional(),
         target_duration: z.coerce.number().int().optional(),
