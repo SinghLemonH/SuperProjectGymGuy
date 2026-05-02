@@ -1,9 +1,7 @@
 import { db, pool } from "../database/supabase";
 import { sql } from "drizzle-orm";
-import { PoolClient } from "pg";
-import {resolveWorkoutPlanId} from "../service/WorkoutPlan.service"
 
-// function take score gain from each exercise plan 
+// function take score gain from each exercise plan  
 interface ScoreExerciseInput {
     user_id : string;
     workout_plan_code?: string;
@@ -29,21 +27,13 @@ interface WorkOutDistInput {
     sortDir? : string;
 }
 
-async function CheckPlanWithUserID(workout_plan_code : Number, user_id : Number) {
-    const rows = await db.execute(sql`
-        SELECT *
-        FROM workout_plan
-        WHERE code = ${workout_plan_code} AND user_id = ${user_id}
-    `);
-
-    const found = Number(rows.rows.length) > 0 ? true : false;
-    return found
-}
-
 export async function ScoreExerciseSummary(input : ScoreExerciseInput)     
 {
-    // page offset 
-    const offset = (Number(input.page) - 1) * Number(input.limit);
+    /* ------------- Defaults & Page Offset ------ */ 
+    const pageVal = Number(input.page) || 1;
+    const limitVal = Number(input.limit) || 10;
+    const offset = limitVal ? (pageVal - 1) * limitVal : 0;
+    const pageOffset = limitVal ? `OFFSET ${offset} LIMIT ${limitVal}` : '';
 
     /* ------------- SORT BY clause -------------- */
     const sortDirection = input.sortDir === "asc" ? "ASC" : "DESC";
@@ -62,49 +52,54 @@ export async function ScoreExerciseSummary(input : ScoreExerciseInput)
         params.push(input.end_date);
     }
 
-    // create view using pool.query (to support parameterized dates)
+    // create view using pool.query
     await pool.query(`
         CREATE OR REPLACE VIEW exercise_plan_view AS
-            SELECT exercise_id, wp.code AS workout_plan_code, SUM(score_override) AS total_score
+            SELECT wp.id AS workout_plan_id, 
+            exercise_id, SUM(score_override) AS total_score
             FROM workout_plan_exercise
             INNER JOIN workout_plan wp ON wp.id = workout_plan_id
             INNER JOIN exercise e ON e.id = exercise_id
             ${whereClause}
-            GROUP BY exercise_id, wp.code
+            GROUP BY wp.id, exercise_id
     `, params);
 
     // query using pool.query
     const rows = await pool.query(`
-        SELECT e.code AS exercise_code, e.name AS exercise_name, e.category AS exercise_category,
-            epv.workout_plan_code AS workout_plan_code, wp.workout_plan_name AS workout_plan_name, epv.total_score AS total_score
+        SELECT wp.code AS workout_plan_code, wp.workout_plan_name,
+            e.code AS exercise_code, e.name AS exercise_name, e.category AS exercise_category,
+            epv.total_score, COUNT(*) OVER() AS full_count
         FROM exercise e
         INNER JOIN exercise_plan_view epv ON e.id = epv.exercise_id
-        INNER JOIN workout_plan wp ON wp.code = epv.workout_plan_code
-        ORDER BY e.code ${sortDirection}
-        OFFSET ${offset} LIMIT ${input.limit}
+        INNER JOIN workout_plan wp ON wp.id = epv.workout_plan_id
+        ORDER BY wp.code ${sortDirection}, e.code ${sortDirection}
+        ${pageOffset}
     `);
     
     // check number of row 
-    const total = Number(rows.rows.length);
+    const total = rows.rows.length > 0 ? Number(rows.rows[0].full_count) : 0;
     
     return {
     data: rows,
-    page: Number(input.page),
-    limit: Number(input.limit),
+    page: pageVal,
+    limit: limitVal || total,
     total: total,
-    totalPages: Math.ceil(total / Number(input.limit)),
+    totalPages: limitVal ? Math.ceil(total / limitVal) : 1,
   };
 }
 
 export async function ExerciseMusclePlanList(input : ExerciseMusclePlanInput) {
 
-    // page offset 
-    const offset = (Number(input.page) - 1) * Number(input.limit);
+    /* ------------- Defaults & Page Offset ------ */ 
+    const pageVal = Number(input.page) || 1;
+    const limitVal = Number(input.limit) || 10;
+    const offset = limitVal ? (pageVal - 1) * limitVal : 0;
+    const pageOffset = limitVal ? `OFFSET ${offset} LIMIT ${limitVal}` : '';
 
     /* ------------- SORT BY clause -------------- */
     const sortDirection = input.sortDir === "asc" ? "ASC" : "DESC";
 
-        /* ------------- WHERE clause --------------- */
+    /* ------------- WHERE clause --------------- */
     let whereClause = `WHERE wp.user_id = ${input.user_id}`;
 
     const params = [];
@@ -120,29 +115,33 @@ export async function ExerciseMusclePlanList(input : ExerciseMusclePlanInput) {
             wp.end_date AS end_date,
             ema.name AS muscle_name, 
             e.code AS exercise_code, 
-            e.name AS exercise_name 
+            e.name AS exercise_name,
+            COUNT(*) OVER() AS full_count
         FROM workout_plan AS wp 
         INNER JOIN workout_plan_exercise wpe ON wpe.workout_plan_id = wp.id
         INNER JOIN exercise e ON e.id = wpe.exercise_id
         INNER JOIN exercise_muscle_aff ema ON ema.exercise_id = e.id
         ${whereClause}
         ORDER BY wp.code ${sortDirection}, e.code ${sortDirection}
-        OFFSET ${offset} LIMIT ${input.limit}
+        ${pageOffset}
     `, params);
 
-    const total = rows.rows.length;
+    const total = rows.rows.length > 0 ? Number(rows.rows[0].full_count) : 0;
     return {
     data: rows,
-    page: Number(input.page),
-    limit: Number(input.limit),
+    page: pageVal,
+    limit: limitVal || total,
     total: total,
-    totalPages: Math.ceil(total / Number(input.limit))
+    totalPages: limitVal ? Math.ceil(total / limitVal) : 1,
   };
 }
 
 export async function WorkOutDistribution(input : WorkOutDistInput) {
-    // page offset 
-    const offset = (Number(input.page) - 1) * Number(input.limit);
+    /* ------------- Defaults & Page Offset ------ */ 
+    const pageVal = Number(input.page) || 1;
+    const limitVal = Number(input.limit) || 10;
+    const offset = limitVal ? (pageVal - 1) * limitVal : 0;
+    const pageOffset = limitVal ? `OFFSET ${offset} LIMIT ${limitVal}` : '';
 
     /* ------------- SORT BY clause -------------- */
     const sortDirection = input.sortDir === "asc" ? "ASC" : "DESC";
@@ -161,19 +160,21 @@ export async function WorkOutDistribution(input : WorkOutDistInput) {
             wp.name as workout_plan_name, 
             wp.start_date AS start_date, 
             wp.end_date AS end_date,
-            wpd.total_score AS total_score
+            wpd.total_score AS total_score,
+            wp.completeness AS plan_completeness,
+            COUNT(*) OVER() AS full_count
         FROM workout_plan wp
         INNER JOIN workout_plan_dist wpd ON wpd.workout_plan_id = wp.id
         ORDER BY total_score ${sortDirection}, wp.code
-        OFFSET ${offset} LIMIT ${input.limit}
+        ${pageOffset}
     `);
     
-    const total = rows.rows.length;
+    const total = rows.rows.length > 0 ? Number(rows.rows[0].full_count) : 0;
     return {
     data: rows,
-    page: Number(input.page),
-    limit: Number(input.limit),
+    page: pageVal,
+    limit: limitVal || total,
     total: total,
-    totalPages: Math.ceil(total / Number(input.limit))
+    totalPages: limitVal ? Math.ceil(total / limitVal) : 1,
     };
 }
