@@ -5,7 +5,7 @@ dotenv.config({ path: ".env.local" });
 import { testconn } from "./database/supabase";
 import authRoutes from "./routes/auth.routes";
 import workoutSessionRoutes from "./routes/WorkoutSession.route";
-import userRoutes from "./routes/users.routes";
+import userRoutes from "./routes/Users.routes";
 
 const app = express();
 
