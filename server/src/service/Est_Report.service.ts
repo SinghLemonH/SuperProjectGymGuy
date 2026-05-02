@@ -42,6 +42,10 @@ export async function ScoreExerciseSummary(input : ScoreExerciseInput)
     const params = [];
     let whereClause = `WHERE wp.user_id = ${input.user_id}`;
 
+    if (input.workout_plan_code) {
+        whereClause += ` AND wp.code = $${params.length + 1}`;
+        params.push(input.workout_plan_code);
+    }
     if (input.start_date) {
         whereClause += ` AND wp.start_date >= $${params.length + 1}`;
         params.push(input.start_date);
@@ -56,7 +60,7 @@ export async function ScoreExerciseSummary(input : ScoreExerciseInput)
     await pool.query(`
         CREATE OR REPLACE VIEW exercise_plan_view AS
             SELECT wp.id AS workout_plan_id, 
-            exercise_id, SUM(score_override) AS total_score
+            exercise_id, SUM(e.score_based) AS total_score
             FROM workout_plan_exercise
             INNER JOIN workout_plan wp ON wp.id = workout_plan_id
             INNER JOIN exercise e ON e.id = exercise_id
@@ -66,7 +70,7 @@ export async function ScoreExerciseSummary(input : ScoreExerciseInput)
 
     // query using pool.query
     const rows = await pool.query(`
-        SELECT wp.code AS workout_plan_code, wp.workout_plan_name,
+        SELECT wp.code AS workout_plan_code, wp.plan_name AS workout_plan_name,
             e.code AS exercise_code, e.name AS exercise_name, e.category AS exercise_category,
             epv.total_score, COUNT(*) OVER() AS full_count
         FROM exercise e
@@ -110,7 +114,7 @@ export async function ExerciseMusclePlanList(input : ExerciseMusclePlanInput) {
 
     const rows = await pool.query(`
         SELECT wp.code AS workout_plan_code,
-            wp.name AS workout_plan_name, 
+            wp.plan_name AS workout_plan_name, 
             wp.start_date AS start_date, 
             wp.end_date AS end_date,
             ema.name AS muscle_name, 
@@ -149,15 +153,16 @@ export async function WorkOutDistribution(input : WorkOutDistInput) {
     // create view 
     await db.execute(sql`
         CREATE OR REPLACE VIEW workout_plan_dist AS 
-            SELECT wpe.workout_plan_id AS workout_plan_id, SUM(wpe.score_override) AS total_score
+            SELECT wpe.workout_plan_id AS workout_plan_id, SUM(e.score_based) AS total_score
             FROM workout_plan_exercise wpe
+            INNER JOIN exercise e ON e.id = wpe.exercise_id
             INNER JOIN workout_plan wp ON wp.id = wpe.workout_plan_id
             WHERE wp.user_id = ${input.user_id}
             GROUP BY wpe.workout_plan_id`);
     
     const rows = await pool.query(`
         SELECT wp.code AS workout_plan_code, 
-            wp.name as workout_plan_name, 
+            wp.plan_name as workout_plan_name, 
             wp.start_date AS start_date, 
             wp.end_date AS end_date,
             wpd.total_score AS total_score,

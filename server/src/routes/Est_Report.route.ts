@@ -7,9 +7,7 @@ const r = Router();
 r.get("/score-exercise-summary", c.handleScoreExerciseSummary);
 
 // EX GET /exercise-muscle-plan-list?user_id=5&muscle_area=chest
-r.get("/exercise-muscle-plan-list", c.handleExerciseMusclePlanList
-
-);
+r.get("/exercise-muscle-plan-list", c.handleExerciseMusclePlanList);
 // EX GET /workout-distribution?user_id=5
 r.get("/workout-distribution", c.handleWorkOutDistribution);
 
