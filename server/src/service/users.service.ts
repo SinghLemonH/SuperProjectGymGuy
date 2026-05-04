@@ -42,10 +42,11 @@ export const getUserDashboard = async (id: string) => {
         SELECT COALESCE(SUM(wse.actual_duration * e.calorie_rate), 0) AS total_calories
         FROM workout_session ws
         JOIN workout_session_exercise wse ON wse.workout_session_id = ws.id
-        JOIN exercise e ON e.id = wse.exercise_id
+        JOIN workout_plan_exercise wpe ON wpe.id = wse.workout_plan_exercise_id
+        JOIN exercise e ON e.id = wpe.exercise_id
         WHERE ws.user_id = ${id}
     `);
-
+    
     //find active workout plan
     const planResult = await db.execute(sql`
         SELECT id, plan_name, completeness
