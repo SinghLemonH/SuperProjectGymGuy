@@ -1,4 +1,4 @@
-import { pgTable, foreignKey, uuid, smallint, text, timestamp, unique, real, date, numeric, check, pgEnum } from "drizzle-orm/pg-core"
+import { pgTable, foreignKey, uuid, smallint, timestamp, unique, text, real, date, numeric, check, pgEnum } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const cautionType = pgEnum("caution_type", ['injury', 'chronic_health', 'allergy', 'physical_restriction', 'medication', 'diet'])
@@ -10,28 +10,6 @@ export const scaleText = pgEnum("scale_text", ['low', 'medium', 'high'])
 export const sex = pgEnum("sex", ['male', 'female'])
 export const userLevel = pgEnum("user_level", ['beginner', 'intermediate', 'advanced', 'professional'])
 
-
-export const workoutSessionExercise = pgTable("workout_session_exercise", {
-	workoutSessionId: uuid("workout_session_id").notNull(),
-	exerciseId: uuid("exercise_id"),
-	actualWeight: smallint("actual_weight"),
-	actualSet: smallint("actual_set").notNull(),
-	actualReps: smallint("actual_reps"),
-	actualDuration: smallint("actual_duration"),
-	notes: text(),
-	id: uuid().defaultRandom().primaryKey().notNull(),
-}, (table) => [
-	foreignKey({
-			columns: [table.exerciseId],
-			foreignColumns: [exercise.id],
-			name: "workout_session_exercise_exercise_id_fkey"
-		}).onUpdate("cascade").onDelete("restrict"),
-	foreignKey({
-			columns: [table.workoutSessionId],
-			foreignColumns: [workoutSession.id],
-			name: "workout_session_exercise_workout_session_id_fkey"
-		}).onUpdate("cascade").onDelete("restrict"),
-]);
 
 export const workoutSession = pgTable("workout_session", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
@@ -102,6 +80,24 @@ export const users = pgTable("users", {
 	unique("User_Email_key").on(table.email),
 ]);
 
+export const workoutSessionExercise = pgTable("workout_session_exercise", {
+	workoutSessionId: uuid("workout_session_id").notNull(),
+	notes: text(),
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	workoutPlanExerciseId: uuid("workout_plan_exercise_id"),
+}, (table) => [
+	foreignKey({
+			columns: [table.workoutPlanExerciseId],
+			foreignColumns: [workoutPlanExercise.id],
+			name: "workout_session_exercise_workout_plan_exercise_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.workoutSessionId],
+			foreignColumns: [workoutSession.id],
+			name: "workout_session_exercise_workout_session_id_fkey"
+		}).onUpdate("cascade").onDelete("restrict"),
+]);
+
 export const exercise = pgTable("exercise", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	code: text().notNull(),
@@ -136,9 +132,9 @@ export const workoutPlanExercise = pgTable("workout_plan_exercise", {
 	targetSets: smallint("target_sets").notNull(),
 	targetReps: smallint("target_reps"),
 	targetDuration: smallint("target_duration"),
-	scoreOverride: numeric("score_override").default('0').notNull(),
 	note: text(),
 	targetWeight: smallint("target_weight"),
+	dateNumber: smallint("date_number").default(sql`'1'`),
 }, (table) => [
 	foreignKey({
 			columns: [table.exerciseId],
