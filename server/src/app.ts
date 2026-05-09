@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth.routes";
 import exercisesRoutes from "./routes/exercises.routes";
 import musclesRoutes from "./routes/muscles.routes";
 import reportsRoutes from "./routes/wathit_reports.routes";
+import mayReportRoutes from "./routes/may_report.route";
 import workoutSessionRoutes from "./routes/WorkoutSession.route";
 import userRoutes from "./routes/Users.routes";
 
@@ -21,6 +22,7 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/exercises", exercisesRoutes);
 app.use("/api/v1/muscles", musclesRoutes);
 app.use("/api/v1/reports", reportsRoutes);
+app.use("/api/v1", mayReportRoutes);
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1", authRoutes);
