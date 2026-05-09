@@ -1,9 +1,28 @@
 import { db } from "../database/supabase";
 import { sql } from "drizzle-orm";
 
-import {CreateWorkoutSessionInput,UpdateWorkoutSessionInput} from "../models/WorkoutSession.model";
+import {
+  CreateWorkoutSessionInput,
+  UpdateWorkoutSessionInput,
+} from "../models/WorkoutSession.model";
 
-//Get by user
+const updatePlanCompleteness = async (workoutPlanId: string) => {
+  await db.execute(sql`
+    UPDATE workout_plan
+    SET completeness = (
+      SELECT ROUND(
+        COUNT(DISTINCT wse.workout_plan_exercise_id)::numeric /
+        NULLIF(COUNT(DISTINCT wpe.id), 0) * 100
+      )
+      FROM workout_plan_exercise wpe
+      LEFT JOIN workout_session_exercise wse
+        ON wse.workout_plan_exercise_id = wpe.id
+      WHERE wpe.workout_plan_id = ${workoutPlanId}
+    )
+    WHERE id = ${workoutPlanId}
+  `);
+};
+
 export const getWorkoutSessionsByUserId = async (userId: string) => {
   try {
     const result = await db.execute(sql`
@@ -18,12 +37,11 @@ export const getWorkoutSessionsByUserId = async (userId: string) => {
     throw {
       status: 500,
       error_code: "INTERNAL_ERROR",
-      message: "Cannot fetch workout sessions"
+      message: "Cannot fetch workout sessions",
     };
   }
 };
 
-//Get by id
 export const getWorkoutSessionById = async (id: string) => {
   try {
     const result = await db.execute(sql`
@@ -37,7 +55,7 @@ export const getWorkoutSessionById = async (id: string) => {
       throw {
         status: 404,
         error_code: "NOT_FOUND",
-        message: "Workout session not found"
+        message: "Workout session not found",
       };
     }
 
@@ -47,9 +65,13 @@ export const getWorkoutSessionById = async (id: string) => {
   }
 };
 
-//Create
-export const createWorkoutSession = async (input: CreateWorkoutSessionInput) => {
+export const createWorkoutSession = async (
+  input: CreateWorkoutSessionInput
+) => {
   try {
+
+//หา session_no ถัดไป user
+
     const sessionNoResult = await db.execute(sql`
       SELECT COALESCE(MAX(session_no), 0) + 1 AS next_no
       FROM workout_session
@@ -58,9 +80,11 @@ export const createWorkoutSession = async (input: CreateWorkoutSessionInput) => 
 
     const nextNo = sessionNoResult.rows[0].next_no;
 
-    const result = await db.execute(sql`
+//สร้าง workout_session
+
+    const sessionResult = await db.execute(sql`
       INSERT INTO workout_session
-      (session_no, user_id, workout_plan_id, session_datetime)
+        (session_no, user_id, workout_plan_id, session_datetime)
       VALUES (
         ${nextNo},
         ${input.user_id},
@@ -70,17 +94,60 @@ export const createWorkoutSession = async (input: CreateWorkoutSessionInput) => 
       RETURNING *
     `);
 
-    return result.rows[0];
-  } catch {
-    throw {
-      status: 500,
-      error_code: "INTERNAL_ERROR",
-      message: "Cannot create workout session"
+    const session = sessionResult.rows[0];
+
+//INSERT workout_session_exercise แต่ละ exercise
+//calories คำนวณ JOIN workout_plan_exercise กับ exercise
+
+    const exerciseRows = await Promise.all(
+      input.exercises.map((ex) =>
+        db.execute(sql`
+          INSERT INTO workout_session_exercise
+            (workout_session_id, workout_plan_exercise_id,
+             actual_weight, actual_set, actual_reps, actual_duration,
+             notes, calories_burned)
+          VALUES (
+            ${session.id},
+            ${ex.workout_plan_exercise_id},
+            ${ex.actualWeight ?? null},
+            ${ex.actualSet ?? null},
+            ${ex.actualReps},
+            ${ex.actualDuration},
+            ${ex.notes ?? null},
+            (
+              SELECT ROUND(
+                e.calories_per_hour
+                * (${ex.actualDuration}::numeric / 3600)
+              )
+              FROM workout_plan_exercise wpe
+              JOIN exercise e ON e.id = wpe.exercise_id
+              WHERE wpe.id = ${ex.workout_plan_exercise_id}
+            )
+          )
+          RETURNING *
+        `)
+      )
+    );
+    
+//update Completeness ของ plan
+
+    await updatePlanCompleteness(input.workout_plan_id);
+
+    return {
+      ...session,
+      exercises: exerciseRows.map((r) => r.rows[0]),
     };
+  } catch (error:any) {
+    throw error.status
+      ? error
+      : {
+          status: 500,
+          error_code: "INTERNAL_ERROR",
+          message: "Cannot create workout session",
+        };
   }
 };
 
-//Update
 export const updateWorkoutSession = async (
   id: string,
   input: UpdateWorkoutSessionInput
@@ -89,7 +156,7 @@ export const updateWorkoutSession = async (
     const result = await db.execute(sql`
       UPDATE workout_session
       SET session_datetime =
-        COALESCE(${input.session_datetime}, session_datetime)
+        COALESCE(${input.session_datetime ?? null}, session_datetime)
       WHERE id = ${id}
       RETURNING *
     `);
@@ -98,34 +165,87 @@ export const updateWorkoutSession = async (
       throw {
         status: 404,
         error_code: "NOT_FOUND",
-        message: "Workout session not found"
+        message: "Workout session not found",
       };
     }
 
-    return result.rows[0];
+    const session:any = result.rows[0];
+
+    if (input.exercises && input.exercises.length > 0) {
+      await db.execute(sql`
+        DELETE FROM workout_session_exercise
+        WHERE workout_session_id = ${id}
+      `);
+
+      await Promise.all(
+        input.exercises.map((ex) =>
+          db.execute(sql`
+            INSERT INTO workout_session_exercise
+              (workout_session_id, workout_plan_exercise_id,
+               actual_weight, actual_set, actual_reps, actual_duration,
+               notes, calories_burned)
+            VALUES (
+              ${id},
+              ${ex.workout_plan_exercise_id},
+              ${ex.actualWeight ?? null},
+              ${ex.actualSet ?? null},
+              ${ex.actualReps},
+              ${ex.actualDuration},
+              ${ex.notes ?? null},
+              (
+                SELECT ROUND(
+                  e.calories_per_hour
+                  * (${ex.actualDuration}::numeric / 3600)
+                )
+                FROM workout_plan_exercise wpe
+                JOIN exercise e ON e.id = wpe.exercise_id
+                WHERE wpe.id = ${ex.workout_plan_exercise_id}
+              )
+            )
+            RETURNING *
+          `)
+        )
+      );
+
+      await updatePlanCompleteness(session.workout_plan_id);
+    }
+
+    return session;
   } catch (error) {
     throw error;
   }
 };
 
-//Delete
 export const deleteWorkoutSession = async (id: string) => {
   try {
-    const result = await db.execute(sql`
-      DELETE FROM workout_session
+
+    const sessionResult = await db.execute(sql`
+      SELECT workout_plan_id
+      FROM workout_session
       WHERE id = ${id}
-      RETURNING *
+      LIMIT 1
     `);
 
-    if (result.rows.length === 0) {
+    if (sessionResult.rows.length === 0) {
       throw {
         status: 404,
         error_code: "NOT_FOUND",
-        message: "Workout session not found"
+        message: "Workout session not found na ja",
       };
     }
 
-    return { message: "Workout session deleted successfully" };
+    const workoutPlanId = sessionResult.rows[0].workout_plan_id as string;
+
+    await db.execute(sql`
+      DELETE FROM workout_session
+      WHERE id = ${id}
+    `);
+
+// trigger update completeness หลังลบ
+
+    await updatePlanCompleteness(workoutPlanId);
+
+    return { message: "Workout session deleted successfully na ja" };
   } catch (error) {
     throw error;
   }

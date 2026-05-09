@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const ExerciseLogSchema = z.object({
-  exercise_id: z.string().uuid(),
+  workout_plan_exercise_id: z.string().uuid(),
 
   actualWeight: z.coerce.number().min(0).optional(),
 
@@ -14,7 +14,7 @@ const ExerciseLogSchema = z.object({
   notes: z.string().optional(),
 });
 
-/*POST /workout-sessions*/
+//POST /workout-sessions
 
 export const CreateWorkoutSessionSchema = z.object({
   user_id: z.string().uuid(),
@@ -23,16 +23,17 @@ export const CreateWorkoutSessionSchema = z.object({
   exercises: z.array(ExerciseLogSchema).min(1),
 });
 
-/*PATCH /workout-sessions/:id*/
+//PATCH /workout-sessions/:id
 export const UpdateWorkoutSessionSchema = z.object({
   session_datetime: z.string().optional(),
 
   exercises: z.array(ExerciseLogSchema).optional(),
 });
 
-/*type for service / controller*/
+//type for service / controller
 export type CreateWorkoutSessionInput =
   z.infer<typeof CreateWorkoutSessionSchema>;
 
 export type UpdateWorkoutSessionInput =
   z.infer<typeof UpdateWorkoutSessionSchema>;
+0
