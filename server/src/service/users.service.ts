@@ -77,36 +77,37 @@ export const getUserDashboard = async (id: string) => {
 export const getUserLeaderboard = async (id: string) => {
 
     //top 10 users by total calories this mount
-    const leaderboardResult = await db.execute(sql`
+  const leaderboardResult = await db.execute(sql`
+    SELECT 
+        u.id,
+        u.username,
+        u.user_level,
+        COALESCE(SUM(wse.actual_duration * e.calorie_rate), 0) AS total_calories
+    FROM users u
+    LEFT JOIN workout_session ws ON ws.user_id = u.id
+        AND DATE_TRUNC('month', ws.session_datetime) = DATE_TRUNC('month', NOW())
+    LEFT JOIN workout_session_exercise wse ON wse.workout_session_id = ws.id
+    LEFT JOIN workout_plan_exercise wpe ON wpe.id = wse.workout_plan_exercise_id
+    LEFT JOIN exercise e ON e.id = wpe.exercise_id
+    GROUP BY u.id, u.username, u.user_level
+    ORDER BY total_calories DESC
+    LIMIT 10
+`);
+
+const rankResult = await db.execute(sql`
+    SELECT rank FROM (
         SELECT 
             u.id,
-            u.username,
-            u.user_level,
-            COALESCE(SUM(wse.actual_duration * e.calorie_rate), 0) AS total_calories
+            RANK() OVER (ORDER BY COALESCE(SUM(wse.actual_duration * e.calorie_rate), 0) DESC) AS rank
         FROM users u
         LEFT JOIN workout_session ws ON ws.user_id = u.id
             AND DATE_TRUNC('month', ws.session_datetime) = DATE_TRUNC('month', NOW())
         LEFT JOIN workout_session_exercise wse ON wse.workout_session_id = ws.id
-        LEFT JOIN exercise e ON e.id = wse.exercise_id
-        GROUP BY u.id, u.username, u.user_level
-        ORDER BY total_calories DESC
-        LIMIT 10
-    `);
-
-    //find rank of this user
-    const rankResult = await db.execute(sql`
-        SELECT rank FROM (
-            SELECT 
-                u.id,
-                RANK() OVER (ORDER BY COALESCE(SUM(wse.actual_duration * e.calorie_rate), 0) DESC) AS rank
-            FROM users u
-            LEFT JOIN workout_session ws ON ws.user_id = u.id
-                AND DATE_TRUNC('month', ws.session_datetime) = DATE_TRUNC('month', NOW())
-            LEFT JOIN workout_session_exercise wse ON wse.workout_session_id = ws.id
-            LEFT JOIN exercise e ON e.id = wse.exercise_id
-            GROUP BY u.id
-        ) ranked
-        WHERE id = ${id}
+        LEFT JOIN workout_plan_exercise wpe ON wpe.id = wse.workout_plan_exercise_id
+        LEFT JOIN exercise e ON e.id = wpe.exercise_id
+        GROUP BY u.id
+    ) ranked
+    WHERE ranked.id = ${id}
     `);
 
     return {

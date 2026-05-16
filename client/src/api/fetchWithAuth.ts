@@ -38,7 +38,10 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     res = await makeReq(token)
   }
 
-  const data = await res.json()
+  const contentType = res.headers.get('content-type')
+  const data = contentType?.includes('application/json')
+      ? await res.json()
+      : await res.text()
   if (!res.ok) throw data
   return data as T
 }
