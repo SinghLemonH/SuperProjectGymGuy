@@ -22,7 +22,7 @@ import ApichreportRoutes    from "./routes/may_report.route";
 
 const app = express();
 
-// ─── Middleware ────────────────────────────────────────────────────
+// ─── Middleware ────────────────────────────────────────────────
 app.use(express.json());
 app.use(cors({ origin: "http://localhost:5173" })); 
 
