@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiLogin } from '../api/auth.api'
-import Button from '../components/ui/Button'
-import Input from '../components/ui/Input'
+// import Button from '../components/ui/Button'
+// import Input from '../components/ui/Input'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -29,49 +29,82 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex">
 
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-medium text-gray-900">
-            Gym<span className="text-[#534AB7]">GUY</span>
-          </h1>
-          <p className="text-sm text-gray-400 mt-1">เข้าสู่ระบบเพื่อติดตามการออกกำลังกาย</p>
+      {/* ซ้าย — brand */}
+      <div className="hidden lg:flex w-1/2 bg-indigo-500 flex-col items-center justify-center">
+        <div className="text-5xl font-bold text-white mb-4">
+          Gym<span className="text-indigo-200">GUY</span>
         </div>
-
-        <div className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <Input
-              label="อีเมล"
-              type="email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-            />
-            <Input
-              label="รหัสผ่าน"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              error={error}
-            />
-            <Button type="submit" loading={loading} className="w-full mt-1">
-              เข้าสู่ระบบ
-            </Button>
-          </form>
-        </div>
-
-        <p className="text-center text-sm text-gray-400 mt-4">
-          ยังไม่มีบัญชี?{' '}
-          <Link to="/register" className="text-[#534AB7] hover:underline">
-            สมัครสมาชิก
-          </Link>
-        </p>
-
+        <div className="text-indigo-200 text-lg">ติดตามการออกกำลังกายของคุณ</div>
       </div>
+
+      {/* ขวา — form */}
+      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center bg-gray-50 px-8">
+        <div className="w-full max-w-md">
+
+          <div className="mb-10 text-center lg:text-left">
+            <div className="text-3xl font-bold">
+              <span className="text-gray-900">Gym</span>
+              <span className="text-indigo-500">GUY</span>
+            </div>
+            <div className="text-sm text-gray-400 mt-2">เข้าสู่ระบบเพื่อติดตามการออกกำลังกาย</div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+            <form onSubmit={handleSubmit} className="space-y-5">
+
+              <div>
+                <label className="text-sm text-gray-600 mb-1.5 block">อีเมล</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  required
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-600 mb-1.5 block">รหัสผ่าน</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors"
+                />
+              </div>
+
+              {error && (
+                <div className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-indigo-500 text-white text-sm font-medium py-3 rounded-xl hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+              </button>
+
+            </form>
+
+            <p className="text-xs text-gray-400 text-center mt-6">
+              ยังไม่มีบัญชี?{' '}
+              <Link to="/register" className="text-indigo-500 hover:underline">
+                สมัครสมาชิก
+              </Link>
+            </p>
+          </div>
+
+        </div>
+      </div>
+
     </div>
   )
 }
