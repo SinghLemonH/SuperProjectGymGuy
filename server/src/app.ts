@@ -6,10 +6,16 @@ import { testconn } from "./database/supabase";
 import authRoutes from "./routes/auth.routes";
 import exercisesRoutes from "./routes/exercises.routes";
 import musclesRoutes from "./routes/muscles.routes";
-import reportsRoutes from "./routes/wathit_reports.routes";
-import mayReportRoutes from "./routes/may_report.route";
 import workoutSessionRoutes from "./routes/WorkoutSession.route";
 import userRoutes from "./routes/Users.routes";
+
+
+// --- Report route ----------
+import WathitreportsRoutes from "./routes/wathit_reports.routes";
+import KittireportsRoutes from "./routes/Est_Report.route";
+import WichitreportRoutes from "./routes/reportWichitchai.routes"
+import ApichreportRoutes from "./routes/may_report.route"
+
 
 const app = express();
 
@@ -21,8 +27,11 @@ console.log("DATABASE_URL:", process.env.DATABASE_URL);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/exercises", exercisesRoutes);
 app.use("/api/v1/muscles", musclesRoutes);
-app.use("/api/v1/reports", reportsRoutes);
-app.use("/api/v1", mayReportRoutes);
+
+app.use("/api/v1/WathitReports", WathitreportsRoutes);
+app.use("/api/v1/KittiReports", KittireportsRoutes);
+app.use("/api/v1/WichitReports", WichitreportRoutes);
+app.use("/api/v1/ApichReports", ApichreportRoutes);
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1", authRoutes);

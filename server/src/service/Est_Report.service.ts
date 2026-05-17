@@ -70,9 +70,9 @@ export async function ScoreExerciseSummary(input : ScoreExerciseInput)
 
     // query using pool.query
     const rows = await pool.query(`
-        SELECT wp.code AS workout_plan_code, wp.plan_name AS workout_plan_name,
+        SELECT wp.code AS workout_plan_code, wp.plan_name AS workout_plan_name, wp.user_id AS user_id,
             e.code AS exercise_code, e.name AS exercise_name, e.category AS exercise_category,
-            epv.total_score, COUNT(*) OVER() AS full_count
+            epv.total_score AS total_score, COUNT(*) OVER() AS full_count
         FROM exercise e
         INNER JOIN exercise_plan_view epv ON e.id = epv.exercise_id
         INNER JOIN workout_plan wp ON wp.id = epv.workout_plan_id
