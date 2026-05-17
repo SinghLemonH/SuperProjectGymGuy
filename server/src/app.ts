@@ -2,6 +2,8 @@ import express from "express";
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
+import cors from "cors";    
+
 import { testconn } from "./database/supabase";
 
 // ─── Routes imports ────────────────────────────────────────────────
@@ -22,6 +24,7 @@ const app = express();
 
 // ─── Middleware ────────────────────────────────────────────────────
 app.use(express.json());
+app.use(cors({ origin: "http://localhost:5173" })); 
 
 // ─── Routes ────────────────────────────────────────────────────────
 app.use("/api/v1/auth",      authRoutes);
