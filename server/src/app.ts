@@ -20,6 +20,14 @@ import KittireportsRoutes   from "./routes/Est_Report.route";
 import WichitreportRoutes   from "./routes/reportWichitchai.routes";
 import ApichreportRoutes    from "./routes/may_report.route";
 
+
+// --- Report route ----------
+import WathitreportsRoutes from "./routes/wathit_reports.routes";
+import KittireportsRoutes from "./routes/Est_Report.route";
+import WichitreportRoutes from "./routes/reportWichitchai.routes"
+import ApichreportRoutes from "./routes/may_report.route"
+
+
 const app = express();
 
 // ─── Middleware ────────────────────────────────────────────────
