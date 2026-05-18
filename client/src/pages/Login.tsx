@@ -21,7 +21,7 @@ export default function Login() {
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'message' in err
         ? String((err as { message: unknown }).message)
-        : 'เข้าสู่ระบบไม่สำเร็จ'
+        : 'Sign in failed'
       setError(msg)
     } finally {
       setLoading(false)
@@ -36,7 +36,7 @@ export default function Login() {
         <div className="text-5xl font-bold text-white mb-4">
           Gym<span className="text-indigo-200">GUY</span>
         </div>
-        <div className="text-indigo-200 text-lg">ติดตามการออกกำลังกายของคุณ</div>
+        <div className="text-indigo-200 text-lg">Track your workouts</div>
       </div>
 
       {/* ขวา — form */}
@@ -48,14 +48,14 @@ export default function Login() {
               <span className="text-gray-900">Gym</span>
               <span className="text-indigo-500">GUY</span>
             </div>
-            <div className="text-sm text-gray-400 mt-2">เข้าสู่ระบบเพื่อติดตามการออกกำลังกาย</div>
+            <div className="text-sm text-gray-400 mt-2">Login For Following your exercises</div>
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
             <form onSubmit={handleSubmit} className="space-y-5">
 
               <div>
-                <label className="text-sm text-gray-600 mb-1.5 block">อีเมล</label>
+                <label className="text-sm text-gray-600 mb-1.5 block">Email</label>
                 <input
                   type="email"
                   value={email}
@@ -67,7 +67,7 @@ export default function Login() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-600 mb-1.5 block">รหัสผ่าน</label>
+                <label className="text-sm text-gray-600 mb-1.5 block">Password</label>
                 <input
                   type="password"
                   value={password}
@@ -89,15 +89,15 @@ export default function Login() {
                 disabled={loading}
                 className="w-full bg-indigo-500 text-white text-sm font-medium py-3 rounded-xl hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+                {loading ? 'Loging...' : 'Login'}
               </button>
 
             </form>
 
             <p className="text-xs text-gray-400 text-center mt-6">
-              ยังไม่มีบัญชี?{' '}
+              Don't have an account?{' '}
               <Link to="/register" className="text-indigo-500 hover:underline">
-                สมัครสมาชิก
+                Sign up
               </Link>
             </p>
           </div>
