@@ -1,12 +1,16 @@
 export interface User {
-  id: string
-  username: string
-  email: string
-  bmr: number
+  id:           string
+  username:     string
+  email:        string
+  bmr:          number | null  
   fitness_goal: string
   member_since: string
+  sex:          string         
+  user_level:   string         
+  age:          number        
+  weight:       number         
+  height:       number       
 }
-
 export const getToken    = () => localStorage.getItem('access_token')
 export const getUser     = (): User | null => {
   const raw = localStorage.getItem('user')

@@ -4,7 +4,7 @@ import { ScoreExerciseSummary, ExerciseMusclePlanList, WorkOutDistribution} from
 
 export async function handleScoreExerciseSummary(req : Request, res : Response) {
     try {   
-        const user_id = String(res.locals.userId);
+        const user_id = String(res.locals.userId) || "*";
         const workout_plan_code = req.query.code ? String(req.query.code) : undefined;
         const start_date = req.query.start_date ? String(req.query.start_date) : undefined;
         const end_date = req.query.end_date ? String(req.query.end_date) : undefined;

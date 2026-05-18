@@ -2,12 +2,23 @@ import express from "express";
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
+import cors from "cors";    
+
 import { testconn } from "./database/supabase";
-import authRoutes from "./routes/auth.routes";
-import exercisesRoutes from "./routes/exercises.routes";
-import musclesRoutes from "./routes/muscles.routes";
+
+// ─── Routes imports ────────────────────────────────────────────────
+import authRoutes           from "./routes/auth.routes";
+import userRoutes           from "./routes/Users.routes";
+import exercisesRoutes      from "./routes/exercises.routes";
+import musclesRoutes        from "./routes/muscles.routes";
 import workoutSessionRoutes from "./routes/WorkoutSession.route";
-import userRoutes from "./routes/Users.routes";
+import workoutPlanRoutes    from "./routes/WorkoutPlan.routes";
+
+// ─── Report routes ─────────────────────────────────────────────────
+import WathitreportsRoutes  from "./routes/wathit_reports.routes";
+import KittireportsRoutes   from "./routes/Est_Report.route";
+import WichitreportRoutes   from "./routes/reportWichitchai.routes";
+import ApichreportRoutes    from "./routes/may_report.route";
 
 
 // --- Report route ----------
@@ -19,24 +30,23 @@ import ApichreportRoutes from "./routes/may_report.route"
 
 const app = express();
 
-// ─── Middleware ────────────────────────────────────────────────────
-app.use(express.json()); // parse JSON body
+// ─── Middleware ────────────────────────────────────────────────
+app.use(express.json());
+app.use(cors({ origin: "http://localhost:5173" })); 
 
 // ─── Routes ────────────────────────────────────────────────────────
-console.log("DATABASE_URL:", process.env.DATABASE_URL);
-app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/auth",      authRoutes);
+app.use("/api/v1/users",     userRoutes);
 app.use("/api/v1/exercises", exercisesRoutes);
-app.use("/api/v1/muscles", musclesRoutes);
+app.use("/api/v1/muscles",   musclesRoutes);
+app.use("/api/v1",           workoutSessionRoutes);
+app.use("/api/v1",           workoutPlanRoutes);
 
-app.use("/api/v1/WathitReports", WathitreportsRoutes);
-app.use("/api/v1/KittiReports", KittireportsRoutes);
-app.use("/api/v1/WichitReports", WichitreportRoutes);
-app.use("/api/v1/ApichReports", ApichreportRoutes);
-
-app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1", authRoutes);
-app.use("/api/v1", workoutSessionRoutes);
-app.use("/api/v1/users", userRoutes);
+// ─── Reports ───────────────────────────────────────────────────────
+app.use("/api/v1/reports",   WathitreportsRoutes);
+app.use("/api/v1/reports",   KittireportsRoutes);
+app.use("/api/v1/reports",   WichitreportRoutes);
+app.use("/api/v1/reports",   ApichreportRoutes);
 
 // ─── Start Server ──────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;

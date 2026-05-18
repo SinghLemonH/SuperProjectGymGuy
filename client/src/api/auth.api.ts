@@ -13,7 +13,7 @@ export async function apiRegister(payload: {
   email: string
   password: string
   fitness_goal: string
-  gender: string
+  sex: string
   age: number
   weight: number
   height: number
