@@ -1,5 +1,4 @@
-import { db, pool } from "../database/supabase";
-import { sql } from "drizzle-orm";
+import { pool } from "../database/supabase";
 
 // function take score gain from each exercise plan  
 interface ScoreExerciseInput {
@@ -39,34 +38,43 @@ export async function ScoreExerciseSummary(input : ScoreExerciseInput)
     const sortDirection = input.sortDir === "asc" ? "ASC" : "DESC";
 
     /* ------------- WHERE clause ---------------- */
-    let whereExtra = sql``;
+    // Use string interpolation for user_id since it's a validated UUID
+    // This avoids parameter binding issues with CREATE VIEW
+    let viewWhere = `WHERE wp.user_id = '${input.user_id}'`;
+
+    const params: any[] = [];
     if (input.workout_plan_code) {
-        whereExtra = sql`AND wp.code = ${input.workout_plan_code}`;
+        params.push(input.workout_plan_code);
+        viewWhere += ` AND wp.code = $${params.length}`;
     }
     if (input.start_date) {
-        whereExtra = sql`${whereExtra} AND wp.start_date >= ${input.start_date}`;
+        params.push(input.start_date);
+        viewWhere += ` AND wp.start_date >= $${params.length}`;
     }
     if (input.end_date) {
-        whereExtra = sql`${whereExtra} AND wp.end_date <= ${input.end_date}`;
+        params.push(input.end_date);
+        viewWhere += ` AND wp.end_date <= $${params.length}`;
     }
 
-    // drop view if exists (to avoid parameter issues)
-    await db.execute(sql`DROP VIEW IF EXISTS exercise_plan_view`);
-
-    // create view using drizzle sql template (interpolates values safely in place)
-    await db.execute(sql`
+    // Drop and recreate view using pool.query
+    await pool.query(`DROP VIEW IF EXISTS exercise_plan_view`, []);
+    
+    // Note: user_id interpolated directly into SQL (safe as UUID format)
+    // Other params use parameterized binding
+    let viewSQL = `
         CREATE VIEW exercise_plan_view AS
             SELECT wp.id AS workout_plan_id, 
             exercise_id, SUM(e.score_based) AS total_score
             FROM workout_plan_exercise
             INNER JOIN workout_plan wp ON wp.id = workout_plan_id
             INNER JOIN exercise e ON e.id = exercise_id
-            WHERE wp.user_id = ${input.user_id}
-            ${whereExtra}
+            ${viewWhere}
             GROUP BY wp.id, exercise_id
-    `);
+    `;
+    
+    await pool.query(viewSQL, params);
 
-    // query using pool.query (no params needed, values already in view)
+    // query using pool.query
     const rows = await pool.query(`
         SELECT wp.code AS workout_plan_code, wp.plan_name AS workout_plan_name, wp.user_id AS user_id,
             e.code AS exercise_code, e.name AS exercise_name, e.category AS exercise_category,
@@ -149,15 +157,17 @@ export async function WorkOutDistribution(input : WorkOutDistInput) {
     /* ------------- SORT BY clause -------------- */
     const sortDirection = input.sortDir === "asc" ? "ASC" : "DESC";
 
-    // create view 
-    await db.execute(sql`
-        CREATE OR REPLACE VIEW workout_plan_dist AS 
+        // Drop old view and create new one
+    await pool.query(`DROP VIEW IF EXISTS workout_plan_dist`, []);
+    await pool.query(`
+        CREATE VIEW workout_plan_dist AS 
             SELECT wpe.workout_plan_id AS workout_plan_id, SUM(e.score_based) AS total_score
             FROM workout_plan_exercise wpe
             INNER JOIN exercise e ON e.id = wpe.exercise_id
             INNER JOIN workout_plan wp ON wp.id = wpe.workout_plan_id
-            WHERE wp.user_id = ${input.user_id}
-            GROUP BY wpe.workout_plan_id`);
+            WHERE wp.user_id = '${input.user_id}'
+            GROUP BY wpe.workout_plan_id
+    `);
     
     const rows = await pool.query(`
         SELECT wp.code AS workout_plan_code, 
