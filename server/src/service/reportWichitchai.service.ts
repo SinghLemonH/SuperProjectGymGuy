@@ -91,18 +91,18 @@ export const getLeaderboardConsistencyCalories = async ({
 
     const targetMonth = month ?? new Date().toISOString().slice(0, 7);
 
-    const result = await db.execute(sql`
+        const result = await db.execute(sql`
         SELECT
             u.id            AS user_id,
             u.username      AS username,
             u.user_level    AS user_level,
-            COALESCE(SUM(wse.actual_duration * e.calorie_rate), 0) AS calories,
+            COALESCE(SUM(wpe.target_duration * e.calorie_rate), 0) AS calories,
             COUNT(DISTINCT DATE(ws.session_datetime)) AS active_days,
             ROUND(
                 COUNT(DISTINCT DATE(ws.session_datetime))::numeric / 30 * 100
             , 2) AS consistency,
             RANK() OVER (
-                ORDER BY COALESCE(SUM(wse.actual_duration * e.calorie_rate), 0) DESC
+                ORDER BY COALESCE(SUM(wpe.target_duration * e.calorie_rate), 0) DESC
             ) AS rank
         FROM users u
         LEFT JOIN workout_session ws
