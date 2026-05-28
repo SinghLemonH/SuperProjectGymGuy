@@ -40,7 +40,8 @@ export async function ScoreExerciseSummary(input : ScoreExerciseInput)
 
     /* ------------- WHERE clause ---------------- */
     const params = [];
-    let whereClause = `WHERE wp.user_id = ${input.user_id}`;
+    let whereClause = `WHERE wp.user_id = $${params.length + 1}`;
+    params.push(input.user_id);
 
     if (input.workout_plan_code) {
         whereClause += ` AND wp.code = $${params.length + 1}`;
@@ -84,7 +85,7 @@ export async function ScoreExerciseSummary(input : ScoreExerciseInput)
     const total = rows.rows.length > 0 ? Number(rows.rows[0].full_count) : 0;
     
     return {
-    data: rows,
+    data: rows.rows,
     page: pageVal,
     limit: limitVal || total,
     total: total,

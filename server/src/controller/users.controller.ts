@@ -2,14 +2,15 @@ import { Request, Response } from "express";
 import { PatchUserSchema } from "../models/users.model";
 import { getUserById, getUserDashboard, getUserLeaderboard, patchUser, deleteUser } from "../service/users.service";
 
-//GET /api/v1/users/:id
-export const getProfile = async (req: Request, res: Response) => {
+//GET /api/v1/users/:id/dashboard
+export const getDashboard = async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
-        const result = await getUserById(id);
+        const result = await getUserDashboard(id);
         return res.status(200).json(result);
 
     } catch (error: any) {
+        console.log("DASHBOARD ERROR:", error);
         if (error.status) {
             return res.status(error.status).json({
                 error_code: error.error_code,
@@ -20,11 +21,11 @@ export const getProfile = async (req: Request, res: Response) => {
     }
 };
 
-//GET /api/v1/users/:id/dashboard
-export const getDashboard = async (req: Request, res: Response) => {
+//GET /api/v1/users/:id
+export const getProfile = async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
-        const result = await getUserDashboard(id);
+        const result = await getUserById(id);
         return res.status(200).json(result);
 
     } catch (error: any) {

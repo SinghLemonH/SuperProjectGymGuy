@@ -80,32 +80,34 @@ export const userDashBoard = (userId: string): Promise<UserProfileIn> =>
 export const userDetailDashboard = (userId: string): Promise<UserDetailIn> => 
     apiFetch(`/users/${userId}`)
   // for leaderboard score
-export const totalScoreDashboard = (
-    code?: string,
-    start_date?: string,
-    end_date?: string,
-    page?: number,
-    limit?: number,
-    sortDir?: string
-): Promise<TotalScoresIn> => {
-    const params = new URLSearchParams()
-    if (code)       params.append('code', code)
-    if (start_date) params.append('start_date', start_date)
-    if (end_date)   params.append('end_date', end_date)
-    if (page)       params.append('page', String(page))
-    if (limit)      params.append('limit', String(limit))
-    if (sortDir)    params.append('sortDir', sortDir)
-    const query = params.toString()
+  export const totalScoreDashboard = (
+      userId: string,
+      code?: string,
+      start_date?: string,
+      end_date?: string,
+      page?: number,
+      limit?: number,
+      sortDir?: string
+  ): Promise<TotalScoresIn> => {
+      const params = new URLSearchParams()
+      params.append('user_id', userId)
+      if (code)       params.append('code', code)
+      if (start_date) params.append('start_date', start_date)
+      if (end_date)   params.append('end_date', end_date)
+      if (page)       params.append('page', String(page))
+      if (limit)      params.append('limit', String(limit))
+      if (sortDir)    params.append('sortDir', sortDir)
+      const query = params.toString()
 
-return apiFetch(`/KittiReports/score-exercise-summary${query ? '?' + query : ''}`)
-}
+  return apiFetch(`/reports/score-exercise-summary${query ? '?' + query : ''}`)
+  }
 
 // for leaderboard calories
 export const leaderboardDashboard = (username?: string): Promise<LeaderboardsIn> => {
     const params = new URLSearchParams()
     if (username) params.append('username', username)
     const query = params.toString()
-    return apiFetch(`/WichitReports/leaderboard-consistency-calories${query ? '?' + query : ''}`)
+    return apiFetch(`/reports/leaderboard-consistency-calories${query ? '?' + query : ''}`)
 }
 
 // for workout session 
