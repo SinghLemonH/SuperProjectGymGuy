@@ -39,37 +39,34 @@ export async function ScoreExerciseSummary(input : ScoreExerciseInput)
     const sortDirection = input.sortDir === "asc" ? "ASC" : "DESC";
 
     /* ------------- WHERE clause ---------------- */
-    const params = [];
-    let whereClause = `WHERE wp.user_id = $${params.length + 1}`;
-    params.push(input.user_id);
-
+    let whereExtra = sql``;
     if (input.workout_plan_code) {
-        whereClause += ` AND wp.code = $${params.length + 1}`;
-        params.push(input.workout_plan_code);
+        whereExtra = sql`AND wp.code = ${input.workout_plan_code}`;
     }
     if (input.start_date) {
-        whereClause += ` AND wp.start_date >= $${params.length + 1}`;
-        params.push(input.start_date);
+        whereExtra = sql`${whereExtra} AND wp.start_date >= ${input.start_date}`;
     }
-
     if (input.end_date) {
-        whereClause += ` AND wp.end_date <= $${params.length + 1}`;
-        params.push(input.end_date);
+        whereExtra = sql`${whereExtra} AND wp.end_date <= ${input.end_date}`;
     }
 
-    // create view using pool.query
-    await pool.query(`
-        CREATE OR REPLACE VIEW exercise_plan_view AS
+    // drop view if exists (to avoid parameter issues)
+    await db.execute(sql`DROP VIEW IF EXISTS exercise_plan_view`);
+
+    // create view using drizzle sql template (interpolates values safely in place)
+    await db.execute(sql`
+        CREATE VIEW exercise_plan_view AS
             SELECT wp.id AS workout_plan_id, 
             exercise_id, SUM(e.score_based) AS total_score
             FROM workout_plan_exercise
             INNER JOIN workout_plan wp ON wp.id = workout_plan_id
             INNER JOIN exercise e ON e.id = exercise_id
-            ${whereClause}
+            WHERE wp.user_id = ${input.user_id}
+            ${whereExtra}
             GROUP BY wp.id, exercise_id
-    `, params);
+    `);
 
-    // query using pool.query
+    // query using pool.query (no params needed, values already in view)
     const rows = await pool.query(`
         SELECT wp.code AS workout_plan_code, wp.plan_name AS workout_plan_name, wp.user_id AS user_id,
             e.code AS exercise_code, e.name AS exercise_name, e.category AS exercise_category,
@@ -104,10 +101,10 @@ export async function ExerciseMusclePlanList(input : ExerciseMusclePlanInput) {
     /* ------------- SORT BY clause -------------- */
     const sortDirection = input.sortDir === "asc" ? "ASC" : "DESC";
 
-    /* ------------- WHERE clause --------------- */
-    let whereClause = `WHERE wp.user_id = ${input.user_id}`;
-
     const params = [];
+    let whereClause = `WHERE wp.user_id = $1`;
+    params.push(input.user_id);
+
     if (input.muscle_area) {
         whereClause += ` AND ema.name = $${params.length + 1}`;
         params.push(input.muscle_area);
@@ -131,9 +128,10 @@ export async function ExerciseMusclePlanList(input : ExerciseMusclePlanInput) {
         ${pageOffset}
     `, params);
 
-    const total = rows.rows.length > 0 ? Number(rows.rows[0].full_count) : 0;
+    const resultRows = rows.rows;
+    const total = resultRows.length > 0 ? Number(resultRows[0].full_count) : 0;
     return {
-    data: rows,
+    data: resultRows,
     page: pageVal,
     limit: limitVal || total,
     total: total,
@@ -175,9 +173,9 @@ export async function WorkOutDistribution(input : WorkOutDistInput) {
         ${pageOffset}
     `);
     
-    const total = rows.rows.length > 0 ? Number(rows.rows[0].full_count) : 0;
+        const total = rows.rows.length > 0 ? Number(rows.rows[0].full_count) : 0;
     return {
-    data: rows,
+    data: rows.rows,
     page: pageVal,
     limit: limitVal || total,
     total: total,
