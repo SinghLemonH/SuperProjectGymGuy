@@ -20,33 +20,35 @@ export default function Dashboard() {
 
     useEffect(() => {
         if (!user) return
-
         const load = async () => {
             try {
-                const [profileData, scoreData, calData, sessionData] = await Promise.all([
+                const [profileData, calData, sessionData] = await Promise.all([
                     userDashBoard(user.id),
-                    totalScoreDashboard(user.id),
                     leaderboardDashboard(user.username),
                     workoutSessionsDashboard(user.id)
                 ])
-                
-                setWorkoutSession(sessionData)
-                setCalScore(calData)
                 setProfile(profileData)
-                setTotalScore(scoreData)
+                setCalScore(calData)
+                setWorkoutSession(sessionData)
             } catch (err) {
                 console.error('Dashboard load failed:', err)
-            } finally {
-                setLoading(false)
             }
-        }
 
+            try {
+                const scoreData = await totalScoreDashboard()
+                setTotalScore(scoreData)
+            } catch {
+                setTotalScore({ data: [], page: 1, limit: 10, total: 0, totalPages: 0 })
+            }
+
+            setLoading(false)
+        }
         load()
     }, [user?.id])
     const myLeaderboardRow = scoreCal?.data.find(row => row.username === user?.username)
 
     if (loading) return <p>Loading...</p>
-    if (!profile || !scoreTotal || !workoutSession || !scoreCal) return <p>Failed to load.</p>
+    if (!profile || !workoutSession || !scoreCal) return <p>Failed to load dashboard.</p>
     return (
         <>
             <h1 className="text-2xl font-bold mb-4">
