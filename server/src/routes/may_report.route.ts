@@ -4,10 +4,10 @@ import {getTotalCaloriesBurnedReport,getTotalWorkoutSessionsReport,getPlanAchiev
 const router = Router();
 
 // Report 1 – แคลรวมต่อ user (simple)
-router.get("/reports/total-calories-burned", getTotalCaloriesBurnedReport);
+router.get("/total-calories-burned", getTotalCaloriesBurnedReport);
 // Report 2 – จำนวน session ต่อ user (simple)
-router.get("/reports/total-workout-sessions", getTotalWorkoutSessionsReport);
+router.get("/total-workout-sessions", getTotalWorkoutSessionsReport);
 // Report 3 – % achievement ต่อ plan ต่อ user (analysis)
-router.get("/reports/plan-achievement", getPlanAchievementReport);
+router.get("/plan-achievement", getPlanAchievementReport);
 
 export default router;

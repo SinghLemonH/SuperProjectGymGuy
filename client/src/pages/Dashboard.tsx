@@ -17,6 +17,7 @@ export default function Dashboard() {
     const [scoreCal, setCalScore] = useState<LeaderboardsIn | null>(null)
     const [workoutSession, setWorkoutSession] = useState<WorkoutSessionIn[] | null>(null)
     const [loading, setLoading]   = useState(true)
+    const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
     useEffect(() => {
         if (!user) return
@@ -45,8 +46,6 @@ export default function Dashboard() {
         }
         load()
     }, [user?.id])
-    const myLeaderboardRow = scoreCal?.data.find(row => row.username === user?.username)
-
     if (loading) return <p>Loading...</p>
     if (!profile || !workoutSession || !scoreCal) return <p>Failed to load dashboard.</p>
     return (
@@ -79,7 +78,7 @@ export default function Dashboard() {
 
                 <StatsCard
                     label="Latest Score"
-                    value={scoreTotal?.data[0]?.total_score ?? '-'}
+                    value={latestScore ?? '-'}
                 />
                 <StatsCard
                     label="Total calories"
