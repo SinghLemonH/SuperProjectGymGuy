@@ -8,6 +8,7 @@ import Dashboard       from './pages/Dashboard'
 import Leaderboard     from './pages/LeaderBoard'
 import WorkoutSessions from './pages/WorkoutSessions'
 import SessionDetail   from './pages/SessionDetail'
+import Report           from './pages/report'
 
 
 const Soon = ({ name }: { name: string }) => (
@@ -36,7 +37,7 @@ export default function App() {
             <Route path="/sessions"         element={<WorkoutSessions />} />
 
             <Route path="/sessions/:id"     element={<SessionDetail />} />
-            <Route path="/reports"          element={<Soon name="Reports" />} />
+            <Route path="/reports"          element={<Report/>} />
           </Route>
         </Route>
 

@@ -1,5 +1,5 @@
 // pages/Leaderboard.tsx
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { getUser } from '../api/auth'
 import { leaderboardDashboard, userDetailDashboard } from '../api/user.api'
 import StatsCard from '../components/ui/StatsCard'
