@@ -137,6 +137,12 @@ export async function ExerciseMusclePlanList(input : ExerciseMusclePlanInput) {
   };
 }
 
+interface WorkOutDistInput {
+    page? : number;
+    limit? : number;
+    sortDir? : string;
+}
+
 export async function WorkOutDistribution(input : WorkOutDistInput) {
     /* ------------- Defaults & Page Offset ------ */ 
     const pageVal = Number(input.page) || 1;
@@ -147,7 +153,7 @@ export async function WorkOutDistribution(input : WorkOutDistInput) {
     /* ------------- SORT BY clause -------------- */
     const sortDirection = input.sortDir === "asc" ? "ASC" : "DESC";
 
-        const rows = await pool.query(`
+    const rows = await pool.query(`
         SELECT wp.code AS workout_plan_code, 
             wp.plan_name as workout_plan_name, 
             wp.start_date AS start_date, 
@@ -169,13 +175,12 @@ export async function WorkOutDistribution(input : WorkOutDistInput) {
         ${pageOffset}
     `);
     
-        const total = rows.rows.length > 0 ? Number(rows.rows[0].full_count) : 0;
+    const total = rows.rows.length > 0 ? Number(rows.rows[0].full_count) : 0;
     return {
-    data: rows.rows,
-    page: pageVal,
-    limit: limitVal || total,
-    total: total,
-    totalPages: limitVal ? Math.ceil(total / limitVal) : 1,
+        data: rows.rows,
+        page: pageVal,
+        limit: limitVal || total,
+        total: total,
+        totalPages: limitVal ? Math.ceil(total / limitVal) : 1,
     };
 }
-// WorkoutPlanList.dto still used exists interface WorkOutDistInput above
