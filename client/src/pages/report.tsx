@@ -101,11 +101,13 @@ function ExercisePopularityTable() {
     const [exerciseList, setExerciseList] = useState<string[]>([])
     const [data, setData]             = useState<WichitReportsIn>()
 
-    // Fetch exercise name list once for dropdown
+        // Fetch exercise name list once for dropdown
     useEffect(() => {
         exerPopularity().then((res) => {
             const names = res.data.map((row) => row.exercise_name)
             setExerciseList(names)
+        }).catch(() => {
+            // Silently handle - dropdown will just be empty
         })
     }, [])
 
