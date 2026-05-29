@@ -20,41 +20,34 @@ export default function Dashboard() {
     const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
     useEffect(() => {
-    if (!user) {
-        setLoading(false)
-        setErrorMsg('Please log in to view the dashboard.')
-        return
-    }
+        if (!user) return
+        const load = async () => {
+            try {
+                const [profileData, calData, sessionData] = await Promise.all([
+                    userDashBoard(user.id),
+                    leaderboardDashboard(user.username),
+                    workoutSessionsDashboard(user.id)
+                ])
+                setProfile(profileData)
+                setCalScore(calData)
+                setWorkoutSession(sessionData)
+            } catch (err) {
+                console.error('Dashboard load failed:', err)
+            }
 
-    const load = async () => {
-        try {
-            const [profileData, scoreData, calData, sessionData] = await Promise.all([
-                userDashBoard(user.id),
-                totalScoreDashboard(user.id),
-                leaderboardDashboard(),
-                workoutSessionsDashboard(user.id)
-            ])
-            
-            setWorkoutSession(sessionData)
-            setCalScore(calData)
-            setProfile(profileData)
-            setTotalScore(scoreData)
-        } catch (err) {
-            console.error('Dashboard load failed:', err)
-            setErrorMsg('Failed to load dashboard data.')
-        } finally {
+            try {
+                const scoreData = await totalScoreDashboard()
+                setTotalScore(scoreData)
+            } catch {
+                setTotalScore({ data: [], page: 1, limit: 10, total: 0, totalPages: 0 })
+            }
+
             setLoading(false)
         }
-    }
-
         load()
     }, [user?.id])
     if (loading) return <p>Loading...</p>
-    if (errorMsg) return <p className="text-red-500">{errorMsg}</p>
-    if (!profile) return <p className="text-red-500">Failed to load essential data.</p>
-
-    const myLeaderboardRow = scoreCal?.data?.find(row => row.username === user?.username)
-    const latestScore = scoreTotal?.data?.[0]?.total_score
+    if (!profile || !workoutSession || !scoreCal) return <p>Failed to load dashboard.</p>
     return (
         <>
             <h1 className="text-2xl font-bold mb-4">
