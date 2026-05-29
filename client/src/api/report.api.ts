@@ -80,7 +80,6 @@ export const totalEnergyBurned = (): Promise<WathitReportsIn> =>
 // ------ kitti (Est) report -----
 
 export const scoreExerciseSummary = (
-    user_id : string,
     workout_plan_code?: string,
     start_date?: string,
     end_date?: string,
@@ -89,7 +88,6 @@ export const scoreExerciseSummary = (
     sortDir? : string
 ): Promise<KittiReportsIn> => {
     const params = new URLSearchParams()
-    params.append('user_id', user_id)
     if (workout_plan_code)       params.append('code', workout_plan_code)
     if (start_date) params.append('start_date', start_date)
     if (end_date)   params.append('end_date', end_date)
@@ -102,14 +100,12 @@ export const scoreExerciseSummary = (
 }
 
 export const exerciseMusclePlanList = (
-    user_id : string,
     muscle_area? : string,
     page? : number,
     limit? : number,
     sortDir? : string
 ): Promise<KittiReportsIn> => {
     const params = new URLSearchParams()
-    params.append('user_id', user_id)
     if (muscle_area) params.append('muscle_area', muscle_area)
     if (page !== undefined)        params.append('page', String(page))
     if (limit !== undefined)       params.append('limit', String(limit))
@@ -120,13 +116,11 @@ export const exerciseMusclePlanList = (
 }
 
 export const workoutDistribution = (
-    user_id : string,
     page? : number,
     limit? : number,
     sortDir? : string
 ): Promise<KittiReportsIn> => {
     const params = new URLSearchParams()
-    params.append('user_id', user_id)
     if (page !== undefined)    params.append('page', String(page))
     if (limit !== undefined)   params.append('limit', String(limit))
     if (sortDir !== undefined) params.append('sortDir', sortDir)
