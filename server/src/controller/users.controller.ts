@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { PatchUserSchema } from "../models/users.model";
 import { getUserById, getUserDashboard, getUserLeaderboard, patchUser, deleteUser } from "../service/users.service";
+import { getWorkoutPlansByUserId } from "../service/WorkoutPlan.service";
 
 //GET /api/v1/users/:id/dashboard
 export const getDashboard = async (req: Request, res: Response) => {
@@ -88,6 +89,24 @@ export const removeUser = async (req: Request, res: Response) => {
         const id = req.params.id as string;
         const result = await deleteUser(id);
         return res.status(200).json(result);
+
+    } catch (error: any) {
+        if (error.status) {
+            return res.status(error.status).json({
+                error_code: error.error_code,
+                message: error.message
+            });
+        }
+        return res.status(500).json({ error_code: "SERVER_ERROR", message: "Internal server error" });
+    }
+};
+
+//GET /api/v1/users/:id/workout-plans
+export const getUserWorkoutPlans = async (req: Request, res: Response) => {
+    try {
+        const userId = req.params.id as string;
+        const plans = await getWorkoutPlansByUserId(userId);
+        return res.status(200).json({ data: plans });
 
     } catch (error: any) {
         if (error.status) {

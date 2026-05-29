@@ -92,10 +92,11 @@ export async function getExerciseById(id: string): Promise<ExerciseResponse | nu
     SELECT id, code, name, category, difficulty_level, calorie_rate, score_based, description
     FROM ${exerciseTable}
     WHERE id = ${id}
+    
   `;
   console.log("querySql.sql:", (querySql as any).sql);
   console.log("querySql.params:", (querySql as any).params);
-  const result = await  db.execute((querySql as any));
+  const result = await  db.execute((querySql));
   const rows = (result as any).rows;
 
   if (rows.length === 0) {

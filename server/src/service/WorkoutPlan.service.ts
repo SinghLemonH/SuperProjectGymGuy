@@ -92,6 +92,26 @@ export async function listWorkoutPlan({
 }
 
 
+/** Get all workout plans for a specific user */
+export async function getWorkoutPlansByUserId(userId: string) {
+  const result = await db.execute(sql`
+    SELECT id,
+           code,
+           plan_name,
+           user_id,
+           difficulty,
+           start_date,
+           end_date,
+           description,
+           completeness
+    FROM workout_plan
+    WHERE user_id = ${userId}
+    ORDER BY start_date DESC
+  `);
+  
+  return result.rows;
+}
+
 /** Resolve workout_plan to id (for internal use). */
 export async function resolveWorkoutPlanId(work_out_plan_code : string) {
   const r = await db.execute(sql`SELECT id FROM workout_plan WHERE code = ${work_out_plan_code}`);
