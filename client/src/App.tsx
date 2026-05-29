@@ -1,21 +1,29 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import ProtectedRoute  from './components/layout/ProtectedRoute'
-import AppLayout       from './components/layout/AppLayout'
-import Login           from './pages/Login'
-import Register        from './pages/Register'
-import Profile         from './pages/Profile'
-import Dashboard       from './pages/Dashboard'
-import Leaderboard     from './pages/LeaderBoard'
-import WorkoutSessions from './pages/WorkoutSessions'
-import SessionDetail   from './pages/SessionDetail'
-import Report           from './pages/report'
+import ProtectedRoute    from './components/layout/ProtectedRoute'
+import AppLayout         from './components/layout/AppLayout'
 
+// Auth
+import Login             from './pages/Login'
+import Register          from './pages/Register'
 
-const Soon = ({ name }: { name: string }) => (
-  <div className="flex items-center justify-center h-screen text-gray-400">
-    {name} — coming soon
-  </div>
-)
+// Wichitchai
+import Profile           from './pages/Profile'
+
+// Kittipich
+import Dashboard         from './pages/Dashboard'
+import Leaderboard       from './pages/LeaderBoard'
+import Report            from './pages/report'
+
+// Wathit
+import Exercises         from './pages/Exercises'
+import ExerciseDetail    from './pages/ExerciseDetail'
+import WorkoutPlans      from './pages/WorkoutPlans'
+import WorkoutPlanDetail from './pages/WorkoutPlanDetail'
+
+// Aphichaya
+import WorkoutSessions   from './pages/WorkoutSessions'
+import SessionDetail     from './pages/SessionDetail'
+//import LogSession        from './pages/LogSession'
 
 export default function App() {
   return (
@@ -29,15 +37,26 @@ export default function App() {
         {/* Protected */}
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
-            <Route path="/dashboard"        element={<Dashboard />} />
-            <Route path="/profile"          element={<Profile />} />
-            <Route path="/leaderboard"      element={<Leaderboard />} />
-            <Route path="/exercises"        element={<Soon name="Exercises" />} />
-            <Route path="/plans"            element={<Soon name="Plans" />} />
-            <Route path="/sessions"         element={<WorkoutSessions />} />
 
-            <Route path="/sessions/:id"     element={<SessionDetail />} />
-            <Route path="/reports"          element={<Report/>} />
+            {/* Kittipich */}
+            <Route path="/dashboard"          element={<Dashboard />} />
+            <Route path="/leaderboard"        element={<Leaderboard />} />
+            <Route path="/reports"            element={<Report />} />
+
+            {/* Wichitchai */}
+            <Route path="/profile"            element={<Profile />} />
+
+            {/* Wathit */}
+            <Route path="/exercises"          element={<Exercises />} />
+            <Route path="/exercises/:id"      element={<ExerciseDetail />} />
+            <Route path="/workout-plans"              element={<WorkoutPlans />} />
+            <Route path="/workout-plans/:id"    element={<WorkoutPlanDetail />} />
+
+            {/* Aphichaya */}
+            <Route path="/sessions"           element={<WorkoutSessions />} />
+            {/* <Route path="/sessions/log"       element={<LogSession />} /> */}
+            <Route path="/sessions/:id"       element={<SessionDetail />} />
+
           </Route>
         </Route>
 

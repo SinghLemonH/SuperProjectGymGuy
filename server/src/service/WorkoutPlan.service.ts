@@ -9,9 +9,16 @@ function isUUID(value: string): boolean {
   return value.length === 36 && value.includes('-');
 }
 
+// ---- Generate a unique plan code if the client did not send one.
+function generatePlanCode(): string {
+  const stamp = Date.now().toString(36).toUpperCase();
+  const rand = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
+  return `WP-${stamp}-${rand}`;
+}
+
 // ─── Types for functions ────────────────────────────────────────────────────────
 
-// type of line item function 
+// type of line item function
 interface LineItemInput {
   exercise_id: string;
   target_sets: number;
@@ -22,13 +29,14 @@ interface LineItemInput {
 }
 
 interface CreateWorkOutPlanInput {
-  plan_code: string;
+  plan_code?: string;          // CHANGED: optional, generated if missing
   plan_name: string;
   user_id: string;
   description?: string;
   start_date: string;
   end_date: string;
-  line_items: LineItemInput[];
+  difficulty?: number;         // CHANGED: accepted for header-only plans
+  line_items?: LineItemInput[]; // CHANGED: optional
 }
 
 interface UpdateWorkOutPlanInput {
@@ -37,6 +45,7 @@ interface UpdateWorkOutPlanInput {
   start_date?: string;
   end_date?: string;
   description?: string;
+  difficulty?: number;         // CHANGED: accepted
   line_items?: LineItemInput[];
 }
 
@@ -48,7 +57,7 @@ export async function listWorkoutPlan({
     sortBy = "code",
     sortDir = "asc"
 } = {}) {
-    // page offset 
+    // page offset
     const offset = (Number(page) - 1) * Number(limit);
 
     // sort element
@@ -56,17 +65,17 @@ export async function listWorkoutPlan({
     const sortColumn = allowedSort.includes(sortBy) ? sortBy : "code";
     const sortDirection = sortDir === "asc" ? "ASC" : "DESC";
 
-    // search element 
+    // search element
     const searchParam = `%${search}%`;
 
-    // retrieve data 
+    // retrieve data
     const planResult = await db.execute(sql`
-        SELECT code AS workout_plan_code, 
+        SELECT code AS workout_plan_code,
             plan_name AS workout_plan_name,
             users.username AS username,
             difficulty,
             start_date,
-            end_date, 
+            end_date,
             description,
             completeness
         FROM workout_plan
@@ -108,7 +117,7 @@ export async function getWorkoutPlansByUserId(userId: string) {
     WHERE user_id = ${userId}
     ORDER BY start_date DESC
   `);
-  
+
   return result.rows;
 }
 
@@ -132,19 +141,19 @@ async function resolvePlanId(idOrCode: string): Promise<string> {
 
 
 
-// --- function below support both id and code -- 
+// --- function below support both id and code --
 
 export async function getWorkoutPlan(idOrCode : string) {
   const id = await resolvePlanId(idOrCode);
 
   const header = await db.execute(sql`
     SELECT code AS plan_code, plan_name,
-            u.username AS user_name, u.member_since AS member_since, 
-            u.age AS age, u.weight AS weight, u.height AS height, u.sex AS sex, 
-            u.user_level AS user_level, u.fitness_goal AS fitness_goal, u.bmr AS bmr, 
+            u.username AS user_name, u.member_since AS member_since,
+            u.age AS age, u.weight AS weight, u.height AS height, u.sex AS sex,
+            u.user_level AS user_level, u.fitness_goal AS fitness_goal, u.bmr AS bmr,
             difficulty, description, completeness,
             start_date, end_date
-    FROM workout_plan 
+    FROM workout_plan
     INNER JOIN users u ON workout_plan.user_id = u.id
     WHERE workout_plan.id = ${id}
     `);
@@ -153,14 +162,14 @@ export async function getWorkoutPlan(idOrCode : string) {
 
   const rows = await db.execute(sql`
     SELECT e.code AS exercise_code, e.name AS exercise_name,
-            e.calorie_rate AS calorie_rate, e.score_based AS score_based, 
+            e.calorie_rate AS calorie_rate, e.score_based AS score_based,
             e.category AS exercise_category, e.difficulty_level AS exercise_difficulty_level,
             target_sets, target_duration, target_weight, note
-    
-    FROM workout_plan_exercise 
+
+    FROM workout_plan_exercise
     INNER JOIN exercise e ON workout_plan_exercise.exercise_id = e.id
     WHERE workout_plan_id = ${id}
-    ORDER BY workout_plan_exercise.id 
+    ORDER BY workout_plan_exercise.id
     `);
 
   return {
@@ -169,14 +178,17 @@ export async function getWorkoutPlan(idOrCode : string) {
   };
 }
 
-async function calculateDifficulty(client : PoolClient, workout_plan_id : string) : Promise<Number>{
+async function calculateDifficulty(client : PoolClient, workout_plan_id : string) : Promise<number | null>{
+  // difficulty_level is the enum scale_number ('1'..'5'); an enum cannot be cast
+  // straight to int, so go through ::text::int before averaging.
   const plan_difficulty = await client.query(
-  `SELECT AVG(e.difficulty_level) AS difficulty
+  `SELECT AVG(e.difficulty_level::text::int) AS difficulty
   FROM workout_plan_exercise wpe
   INNER JOIN exercise e ON e.id = wpe.exercise_id
   WHERE wpe.workout_plan_id = $1`, [workout_plan_id]);
 
-  return plan_difficulty.rows[0].difficulty as Number;
+  const value = plan_difficulty.rows[0]?.difficulty;
+  return value == null ? null : Number(value);
 }
 
 export async function createWorkOutPlan(input: CreateWorkOutPlanInput) {
@@ -187,35 +199,50 @@ export async function createWorkOutPlan(input: CreateWorkOutPlanInput) {
     // Start transaction
     await client.query("BEGIN");
 
-    // 2. Insert workout plan header
+    const planCode = input.plan_code && input.plan_code.trim().length > 0
+      ? input.plan_code
+      : generatePlanCode();
+
+    // difficulty is NOT NULL. New plans usually have no exercises yet, so we
+    // seed it from the chosen difficulty (default 1) and recompute later if
+    // exercises are added.
+    const initialDifficulty = input.difficulty ?? 1;
+
+    // CHANGED: id has no DB default -> generate it with gen_random_uuid(),
+    // and difficulty (NOT NULL) is now provided in the INSERT.
     const planResult = await client.query(
-      `INSERT INTO workout_plan (code, plan_name, user_id, start_date, end_date, description, completeness)
-       VALUES ($1, $2, $3, $4, $5, $6, 0)
+      `INSERT INTO workout_plan (id, code, plan_name, user_id, difficulty, start_date, end_date, description, completeness)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, 0)
        RETURNING id, code, plan_name`,
-      [input.plan_code, input.plan_name, input.user_id, input.start_date, input.end_date, input.description]
+      [planCode, input.plan_name, input.user_id, initialDifficulty, input.start_date, input.end_date, input.description ?? null]
     );
 
     const planId = planResult.rows[0].id;
 
-        for (const li of input.line_items) {
-          await client.query(
-            `INSERT INTO workout_plan_exercise (workout_plan_id, exercise_id, target_sets, target_reps, target_duration, target_weight, note)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [
-              planId,
-              li.exercise_id,
-              li.target_sets,
-              li.target_reps ?? null,
-              li.target_duration ?? null,
-              li.target_weight ?? null,
-              li.note ?? null
-            ]
-          );
-        }
+    const lineItems = input.line_items ?? [];
+    for (const li of lineItems) {
+      await client.query(
+        `INSERT INTO workout_plan_exercise (workout_plan_id, exercise_id, target_sets, target_reps, target_duration, target_weight, note)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          planId,
+          li.exercise_id,
+          li.target_sets,
+          li.target_reps ?? null,
+          li.target_duration ?? null,
+          li.target_weight ?? null,
+          li.note ?? null
+        ]
+      );
+    }
 
-    // Update difficulty 
-    const difficulty = await calculateDifficulty(client, planId)
-    await client.query('UPDATE workout_plan SET difficulty = $1 WHERE id = $2', [difficulty, planId]);
+    // Only recompute difficulty from exercises when there actually are exercises.
+    if (lineItems.length > 0) {
+      const difficulty = await calculateDifficulty(client, planId);
+      if (difficulty != null) {
+        await client.query('UPDATE workout_plan SET difficulty = $1 WHERE id = $2', [difficulty, planId]);
+      }
+    }
 
     // Commit transaction
     await client.query("COMMIT");
@@ -256,6 +283,10 @@ export async function updateWorkOutPlan(input: UpdateWorkOutPlanInput) {
       setClauses.push(`description = $${paramIndex++}`);
       values.push(input.description);
     }
+    if (input.difficulty !== undefined) {
+      setClauses.push(`difficulty = $${paramIndex++}`);
+      values.push(input.difficulty);
+    }
 
     if (setClauses.length > 0) {
       values.push(id);
@@ -276,11 +307,14 @@ export async function updateWorkOutPlan(input: UpdateWorkOutPlanInput) {
             [id, li.exercise_id, li.target_sets, li.target_reps ?? null, li.target_duration ?? null, li.target_weight ?? null, li.note ?? null]
           );
         }
-    }
 
-    // Update difficulty 
-    const difficulty = await calculateDifficulty(client, id);
-    await client.query('UPDATE workout_plan SET difficulty = $1 WHERE id = $2', [difficulty, id]);
+        // CHANGED: recompute difficulty only when there ARE exercises, so a
+        // header-only plan never gets difficulty set to NULL (NOT NULL column).
+        const difficulty = await calculateDifficulty(client, id);
+        if (difficulty != null) {
+          await client.query('UPDATE workout_plan SET difficulty = $1 WHERE id = $2', [difficulty, id]);
+        }
+    }
 
     await client.query("COMMIT");
     return { success: true };
@@ -314,4 +348,3 @@ export async function deleteWorkOutPlan(idOrCode: string) {
     client.release();
   }
 }
-
