@@ -15,7 +15,6 @@ export default function Dashboard() {
     const [scoreCal, setCalScore] = useState<LeaderboardsIn | null>(null)
     const [workoutSession, setWorkoutSession] = useState<WorkoutSessionIn[] | null>(null)
     const [loading, setLoading]   = useState(true)
-    const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
     useEffect(() => {
     if (!user) {
@@ -45,6 +44,8 @@ export default function Dashboard() {
 
         load()
     }, [user?.id])
+    const myLeaderboardRow = scoreCal?.data.find(row => row.username === user?.username)
+
     if (loading) return <p>Loading...</p>
     if (errorMsg) return <p className="text-red-500">{errorMsg}</p>
     if (!profile) return <p className="text-red-500">Failed to load essential data.</p>
