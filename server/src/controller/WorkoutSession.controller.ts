@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import {CreateWorkoutSessionSchema,UpdateWorkoutSessionSchema} from "../models/WorkoutSession.model";
-import {getWorkoutSessionsByUserId,getWorkoutSessionById,createWorkoutSession,updateWorkoutSession,deleteWorkoutSession} from "../service/WorkoutSession.service";
+import {getWorkoutSessionsByUserId,getWorkoutSessionById,createWorkoutSession,updateWorkoutSession,deleteWorkoutSession, getAllSessionsCalories} from "../service/WorkoutSession.service";
 
 //GET /api/v1/users/:userId/workout-sessions
 export const getByUser = async (req: Request, res: Response) => {
@@ -121,6 +121,27 @@ export const remove = async (req: Request, res: Response) => {
     return res.status(500).json({
       error_code: "SERVER_ERROR",
       message: "Internal server error"
+    });
+  }
+};
+
+//GET /api/v1/workout-sessions/calories
+export const getAllCalories = async (req: Request, res: Response) => {
+  try {
+    const result = await getAllSessionsCalories();
+
+    return res.status(200).json(result);
+  } catch (error: any) {
+    if (error.status) {
+      return res.status(error.status).json({
+        error_code: error.error_code,
+        message: error.message,
+      });
+    }
+
+    return res.status(500).json({
+      error_code: "SERVER_ERROR",
+      message: "Internal server error",
     });
   }
 };

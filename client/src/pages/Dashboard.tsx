@@ -50,11 +50,7 @@ export default function Dashboard() {
         load()
     }, [user?.id])
     if (loading) return <p>Loading...</p>
-    if (errorMsg) return <p className="text-red-500">{errorMsg}</p>
-    if (!profile) return <p className="text-red-500">Failed to load essential data.</p>
-
-    const myLeaderboardRow = scoreCal?.data?.find(row => row.username === user?.username)
-    const latestScore = scoreTotal?.data?.[0]?.total_score
+    if (!profile || !scoreTotal || !workoutSession || !scoreCal) return <p>Failed to load.</p>
     return (
         <>
             <h1 className="text-2xl font-bold mb-4">
