@@ -103,6 +103,7 @@ export const leaderboardDashboard = (username?: string): Promise<LeaderboardsIn>
 
 // GET /reports/score-exercise-summary
 export const totalScoreDashboard = (
+  user_id?: string,
   code?: string,
   start_date?: string,
   end_date?: string,
@@ -111,6 +112,7 @@ export const totalScoreDashboard = (
   sortDir?: string
 ): Promise<TotalScoresIn> => {
   const params = new URLSearchParams()
+  if (user_id)    params.append('user_id', user_id)
   if (code)       params.append('code', code)
   if (start_date) params.append('start_date', start_date)
   if (end_date)   params.append('end_date', end_date)

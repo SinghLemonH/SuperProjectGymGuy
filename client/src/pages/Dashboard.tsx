@@ -1,10 +1,9 @@
 // pages/Dashboard.tsx
 import { useEffect, useState } from 'react'
 import { getUser } from '../api/auth'
-import { userDashBoard, totalScoreDashboard, leaderboardDashboard, workoutSessionsDashboard } from '../api/user.api'
-import BannerSlider from '../components/ui/BannerSlider'
-import StatsCard from '../components/ui/StatsCard'
-import type {UserProfileIn, TotalScoresIn, LeaderboardsIn, WorkoutSessionIn} from '../api/user.api'
+import { userDashBoard, leaderboardDashboard, workoutSessionsDashboard } from '../api/user.api'
+import { BannerSlider, StatsCard } from '../components/ui'
+import type {UserProfileIn, LeaderboardsIn, WorkoutSessionIn} from '../api/user.api'
 
 
 export default function Dashboard() {
@@ -12,8 +11,7 @@ export default function Dashboard() {
     const user = getUser()
 
     // Set useState for each function result
-    const [profile, setProfile]   = useState<UserProfileIn | null>(null)
-    const [scoreTotal, setTotalScore] = useState<TotalScoresIn | null>(null)
+        const [profile, setProfile]   = useState<UserProfileIn | null>(null)
     const [scoreCal, setCalScore] = useState<LeaderboardsIn | null>(null)
     const [workoutSession, setWorkoutSession] = useState<WorkoutSessionIn[] | null>(null)
     const [loading, setLoading]   = useState(true)
@@ -27,10 +25,9 @@ export default function Dashboard() {
     }
 
     const load = async () => {
-        try {
-            const [profileData, scoreData, calData, sessionData] = await Promise.all([
+                try {
+            const [profileData, calData, sessionData] = await Promise.all([
                 userDashBoard(user.id),
-                totalScoreDashboard(user.id),
                 leaderboardDashboard(),
                 workoutSessionsDashboard(user.id)
             ])
@@ -38,7 +35,6 @@ export default function Dashboard() {
             setWorkoutSession(sessionData)
             setCalScore(calData)
             setProfile(profileData)
-            setTotalScore(scoreData)
         } catch (err) {
             console.error('Dashboard load failed:', err)
             setErrorMsg('Failed to load dashboard data.')
@@ -53,8 +49,7 @@ export default function Dashboard() {
     if (errorMsg) return <p className="text-red-500">{errorMsg}</p>
     if (!profile) return <p className="text-red-500">Failed to load essential data.</p>
 
-    const myLeaderboardRow = scoreCal?.data?.find(row => row.username === user?.username)
-    const latestScore = scoreTotal?.data?.[0]?.total_score
+        const myLeaderboardRow = scoreCal?.data?.find(row => row.username === user?.username)
     return (
         <>
             <h1 className="text-2xl font-bold mb-4">
@@ -78,15 +73,11 @@ export default function Dashboard() {
                     label="Active Plan"
                     value={profile.active_plan?.plan_name ?? 'No Plan'}
                 />
-                <StatsCard
+                                <StatsCard
                     label="Streak"
                     value={myLeaderboardRow?.consistency ?? '-'}
                 />
 
-                <StatsCard
-                    label="Latest Score"
-                    value={latestScore ?? '-'}
-                />
                 <StatsCard
                     label="Total calories"
                     value={myLeaderboardRow?.calories ?? '-'}

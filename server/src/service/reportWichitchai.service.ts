@@ -63,10 +63,10 @@ export const getUserWeightBMIProgress = async ({
             END AS bmi_status
         FROM users u
         WHERE 1=1
-            ${username ? sql`AND u.username ILIKE ${'%' + username + '%'}` : sql``}
+                        ${username ? sql`AND u.username ILIKE ${'%' + username + '%'}` : sql``}
             ${from_date ? sql`AND u.member_since >= ${from_date}` : sql``}
             ${to_date ? sql`AND u.member_since <= ${to_date}` : sql``}
-        ORDER BY bmi DESC
+        ORDER BY username ASC, bmi DESC
     `);
 
     return { data: result.rows };

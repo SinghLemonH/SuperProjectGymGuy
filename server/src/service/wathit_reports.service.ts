@@ -11,7 +11,8 @@ export async function getUserBMR() {
       height,
       sex,
       bmr AS bmr_kcal_per_day
-    FROM users
+        FROM users
+    ORDER BY username ASC
   `);
 
   return result.rows;
@@ -45,6 +46,7 @@ export async function getExerciseCalories() {
       ON e.id = wpe.exercise_id
 
     GROUP BY u.id, u.username
+    ORDER BY username ASC
   `);
 
   return result.rows;
@@ -82,6 +84,7 @@ export async function getTotalEnergy() {
       ON e.id = wpe.exercise_id
 
     GROUP BY u.id, u.username, u.bmr
+    ORDER BY username ASC
   `);
 
   return result.rows;
