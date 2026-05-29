@@ -37,7 +37,7 @@ Key design decisions:
 
 ## Team & Responsibilities
 
-### Wichitchai — Auth · User Management · Reports
+### Wichitchai 3439 — Auth · User Management · Reports
 
 | Layer | Files | What it does |
 |---|---|---|
@@ -53,7 +53,7 @@ Key design decisions:
 
 ---
 
-### Kittipich — Workout Plans · Dashboard · Leaderboard · Reports
+### Kittipich 3405 — Workout Plans · Dashboard · Leaderboard · Reports
 
 | Layer | Files | What it does |
 |---|---|---|
@@ -63,7 +63,7 @@ Key design decisions:
 
 ---
 
-### Wathit — Exercises · Muscles · Reports
+### Wathit 3495 — Exercises · Muscles · Reports
 
 | Layer | Files | What it does |
 |---|---|---|
@@ -73,7 +73,7 @@ Key design decisions:
 
 ---
 
-### Aphichaya — Workout Sessions · Reports
+### Aphichaya 3447  — Workout Sessions · Reports
 
 | Layer | Files | What it does |
 |---|---|---|
