@@ -51,7 +51,7 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* User card — กดไป Profile */}
+      {/* User card — navigates to Profile */}
       <NavLink
         to="/profile"
         className={({ isActive }) =>
@@ -78,7 +78,7 @@ export default function Sidebar() {
           onClick={e => { e.preventDefault(); handleLogout() }}
           className="w-full text-xs text-gray-400 hover:text-red-500 text-left transition-colors"
         >
-          logout
+          Logout
         </button>
       </NavLink>
 
