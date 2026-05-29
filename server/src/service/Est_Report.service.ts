@@ -47,18 +47,6 @@ export async function ScoreExerciseSummary(input : ScoreExerciseInput)
     }
 
         // Use direct query instead of CREATE/DROP VIEW to avoid race conditions
-
-
-
-
-
-
-
-
-
-
-
-
         const rows = await pool.query(`
         SELECT wp.code AS workout_plan_code, wp.plan_name AS workout_plan_name, wp.user_id AS user_id,
             u.username AS username,
@@ -71,7 +59,7 @@ export async function ScoreExerciseSummary(input : ScoreExerciseInput)
         INNER JOIN users u ON u.id = wp.user_id
         WHERE 1=1 ${whereClause}
         GROUP BY wp.code, wp.plan_name, wp.user_id, u.username, e.code, e.name, e.category
-        ORDER BY u.username ASC, wp.code ${sortDirection}, e.code ${sortDirection}
+                ORDER BY total_score ${sortDirection}, u.username ASC, wp.code
         ${pageOffset}
     `, params);
     
@@ -121,20 +109,20 @@ export async function ExerciseMusclePlanList(input : ExerciseMusclePlanInput) {
         INNER JOIN exercise e ON e.id = wpe.exercise_id
         INNER JOIN exercise_muscle_aff ema ON ema.exercise_id = e.id
         INNER JOIN users u ON u.id = wp.user_id
-        ${whereClause}
-        ORDER BY u.username ASC, wp.code ${sortDirection}, e.code ${sortDirection}
+                ${whereClause}
+        ORDER BY wp.code ${sortDirection}, u.username ASC
         ${pageOffset}
     `, params);
 
     const resultRows = rows.rows;
     const total = resultRows.length > 0 ? Number(resultRows[0].full_count) : 0;
     return {
-    data: resultRows,
-    page: pageVal,
-    limit: limitVal || total,
-    total: total,
-    totalPages: limitVal ? Math.ceil(total / limitVal) : 1,
-  };
+        data: resultRows,
+        page: pageVal,
+        limit: limitVal || total,
+        total: total,
+        totalPages: limitVal ? Math.ceil(total / limitVal) : 1,
+    };
 }
 
 interface WorkOutDistInput {
@@ -171,7 +159,7 @@ export async function WorkOutDistribution(input : WorkOutDistInput) {
             INNER JOIN exercise e ON e.id = wpe.exercise_id
             GROUP BY wpe.workout_plan_id
         ) wpd ON wpd.workout_plan_id = wp.id
-        ORDER BY u.username ASC, total_score ${sortDirection}, wp.code
+        ORDER BY total_score ${sortDirection}, u.username ASC, wp.code
         ${pageOffset}
     `);
     
