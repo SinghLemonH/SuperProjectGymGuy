@@ -64,7 +64,6 @@ export async function listWorkoutPlan({
         SELECT code AS workout_plan_code, 
             plan_name AS workout_plan_name,
             users.username AS username,
-            users.name AS user_name,
             difficulty,
             start_date,
             end_date, 
@@ -78,6 +77,7 @@ export async function listWorkoutPlan({
         const countResult = await db.execute(sql`
       SELECT COUNT(*) as total
       FROM workout_plan
+      INNER JOIN users ON users.id = workout_plan.user_id
       WHERE plan_name ILIKE ${searchParam} OR code ILIKE ${searchParam}
     `);
   const total = Number(countResult.rows[0].total);
