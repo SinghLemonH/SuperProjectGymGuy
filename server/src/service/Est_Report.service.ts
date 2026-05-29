@@ -38,53 +38,36 @@ export async function ScoreExerciseSummary(input : ScoreExerciseInput)
     const sortDirection = input.sortDir === "asc" ? "ASC" : "DESC";
 
     /* ------------- WHERE clause ---------------- */
-    // Use string interpolation for user_id since it's a validated UUID
-    // This avoids parameter binding issues with CREATE VIEW
-    let viewWhere = `WHERE wp.user_id = '${input.user_id}'`;
+    const params: any[] = [input.user_id];
+    let whereClause = `AND wp.user_id = $1`;
 
-    const params: any[] = [];
     if (input.workout_plan_code) {
         params.push(input.workout_plan_code);
-        viewWhere += ` AND wp.code = $${params.length}`;
+        whereClause += ` AND wp.code = $${params.length}`;
     }
     if (input.start_date) {
         params.push(input.start_date);
-        viewWhere += ` AND wp.start_date >= $${params.length}`;
+        whereClause += ` AND wp.start_date >= $${params.length}`;
     }
     if (input.end_date) {
         params.push(input.end_date);
-        viewWhere += ` AND wp.end_date <= $${params.length}`;
+        whereClause += ` AND wp.end_date <= $${params.length}`;
     }
 
-    // Drop and recreate view using pool.query
-    await pool.query(`DROP VIEW IF EXISTS exercise_plan_view`, []);
-    
-    // Note: user_id interpolated directly into SQL (safe as UUID format)
-    // Other params use parameterized binding
-    let viewSQL = `
-        CREATE VIEW exercise_plan_view AS
-            SELECT wp.id AS workout_plan_id, 
-            exercise_id, SUM(e.score_based) AS total_score
-            FROM workout_plan_exercise
-            INNER JOIN workout_plan wp ON wp.id = workout_plan_id
-            INNER JOIN exercise e ON e.id = exercise_id
-            ${viewWhere}
-            GROUP BY wp.id, exercise_id
-    `;
-    
-    await pool.query(viewSQL, params);
-
-    // query using pool.query
+        // Use direct query instead of CREATE/DROP VIEW to avoid race conditions
     const rows = await pool.query(`
         SELECT wp.code AS workout_plan_code, wp.plan_name AS workout_plan_name, wp.user_id AS user_id,
             e.code AS exercise_code, e.name AS exercise_name, e.category AS exercise_category,
-            epv.total_score AS total_score, COUNT(*) OVER() AS full_count
-        FROM exercise e
-        INNER JOIN exercise_plan_view epv ON e.id = epv.exercise_id
-        INNER JOIN workout_plan wp ON wp.id = epv.workout_plan_id
+            SUM(e.score_based) AS total_score,
+            COUNT(*) OVER() AS full_count
+        FROM workout_plan wp
+        INNER JOIN workout_plan_exercise wpe ON wpe.workout_plan_id = wp.id
+        INNER JOIN exercise e ON e.id = wpe.exercise_id
+        WHERE 1=1 ${whereClause}
+        GROUP BY wp.code, wp.plan_name, wp.user_id, e.code, e.name, e.category
         ORDER BY wp.code ${sortDirection}, e.code ${sortDirection}
         ${pageOffset}
-    `);
+    `, params);
     
     // check number of row 
     const total = rows.rows.length > 0 ? Number(rows.rows[0].full_count) : 0;
@@ -157,31 +140,26 @@ export async function WorkOutDistribution(input : WorkOutDistInput) {
     /* ------------- SORT BY clause -------------- */
     const sortDirection = input.sortDir === "asc" ? "ASC" : "DESC";
 
-        // Drop old view and create new one
-    await pool.query(`DROP VIEW IF EXISTS workout_plan_dist`, []);
-    await pool.query(`
-        CREATE VIEW workout_plan_dist AS 
-            SELECT wpe.workout_plan_id AS workout_plan_id, SUM(e.score_based) AS total_score
-            FROM workout_plan_exercise wpe
-            INNER JOIN exercise e ON e.id = wpe.exercise_id
-            INNER JOIN workout_plan wp ON wp.id = wpe.workout_plan_id
-            WHERE wp.user_id = '${input.user_id}'
-            GROUP BY wpe.workout_plan_id
-    `);
-    
+            // Use subquery instead of CREATE/DROP VIEW to avoid race conditions
     const rows = await pool.query(`
         SELECT wp.code AS workout_plan_code, 
             wp.plan_name as workout_plan_name, 
             wp.start_date AS start_date, 
             wp.end_date AS end_date,
-            wpd.total_score AS total_score,
+            COALESCE(wpd.total_score, 0) AS total_score,
             wp.completeness AS plan_completeness,
             COUNT(*) OVER() AS full_count
         FROM workout_plan wp
-        INNER JOIN workout_plan_dist wpd ON wpd.workout_plan_id = wp.id
+        LEFT JOIN (
+            SELECT wpe.workout_plan_id, SUM(e.score_based) AS total_score
+            FROM workout_plan_exercise wpe
+            INNER JOIN exercise e ON e.id = wpe.exercise_id
+            GROUP BY wpe.workout_plan_id
+        ) wpd ON wpd.workout_plan_id = wp.id
+        WHERE wp.user_id = $1
         ORDER BY total_score ${sortDirection}, wp.code
         ${pageOffset}
-    `);
+    `, [input.user_id]);
     
         const total = rows.rows.length > 0 ? Number(rows.rows[0].full_count) : 0;
     return {

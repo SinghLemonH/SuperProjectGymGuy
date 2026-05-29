@@ -138,11 +138,11 @@ export const workoutDistribution = (
 // ------ apich (may) report -----
 // (no query params — simple aggregate reports)
 export const totalCaloriesBurned = (): Promise<MayReportsIn> =>
-    apiFetch(`/reports/reports/total-calories-burned`)
+    apiFetch(`/reports/total-calories-burned`)
 
 export const totalWorkoutSessions = (): Promise<MayReportsIn> =>
-    apiFetch(`/reports/reports/total-workout-sessions`)
+    apiFetch(`/reports/total-workout-sessions`)
 
 export const planAchievement = (): Promise<MayReportsIn> =>
-    apiFetch(`/reports/reports/plan-achievement`)
+    apiFetch(`/reports/plan-achievement`)
 
