@@ -25,13 +25,20 @@ export default function App() {
         {/* Protected */}
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
-            <Route path="/dashboard"   element={<Dashboard />} />
-            <Route path="/profile"     element={<Profile />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/exercises"   element={<Soon name="Exercises" />} />
-            <Route path="/plans"       element={<Soon name="Plans" />} />
-            <Route path="/sessions"    element={<Soon name="Sessions" />} />
-            <Route path="/reports"     element={<Soon name="Reports" />} />
+            <Route path="/dashboard"         element={<Dashboard />} />
+            <Route path="/profile"           element={<Profile />} />
+            <Route path="/leaderboard"       element={<Leaderboard />} />
+
+            <Route path="/exercises"         element={<Exercises />} />
+            <Route path="/exercises/:id"     element={<ExerciseDetail />} />
+
+            {/* ✅ create ต้องมาก่อน /:id ไม่งั้น /create จะถูก match เป็น id="create" */}
+            <Route path="/workout-plans"          element={<WorkoutPlans />} />
+            
+            <Route path="/workout-plans/:id"      element={<WorkoutPlanDetail />} />
+
+            <Route path="/sessions"          element={<Soon name="Sessions" />} />
+            <Route path="/reports"           element={<Soon name="Reports" />} />
           </Route>
         </Route>
 

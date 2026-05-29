@@ -3,12 +3,12 @@ import { getUser } from '../../api/auth'
 import { apiLogout } from '../../api/auth.api'
 
 const navItems = [
-  { to: '/dashboard',   icon: '▦', label: 'Home' },
-  { to: '/exercises',   icon: '◎', label: 'Exercises' },
-  { to: '/plans',       icon: '☰', label: 'My Plans' },
-  { to: '/sessions',    icon: '⊞', label: 'Sessions' },
-  { to: '/leaderboard', icon: '★', label: 'Leaderboard' },
-  { to: '/reports',     icon: '↗', label: 'Reports' },
+  { to: '/dashboard',     icon: '▦', label: 'Home' },
+  { to: '/exercises',     icon: '◎', label: 'Exercises' },
+  { to: '/workout-plans', icon: '☰', label: 'My Plans' }, // ← แก้ /plans → /workout-plans
+  { to: '/sessions',      icon: '⊞', label: 'Sessions' },
+  { to: '/leaderboard',   icon: '★', label: 'Leaderboard' },
+  { to: '/reports',       icon: '↗', label: 'Reports' },
 ]
 
 export default function Sidebar() {
