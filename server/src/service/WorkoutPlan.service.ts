@@ -64,7 +64,7 @@ export async function listWorkoutPlan({
         SELECT code AS workout_plan_code, 
             plan_name AS workout_plan_name,
             users.username AS username,
-            users.name AS user_name,
+
             difficulty,
             start_date,
             end_date, 
@@ -91,6 +91,26 @@ export async function listWorkoutPlan({
   };
 }
 
+
+/** Get all workout plans for a specific user */
+export async function getWorkoutPlansByUserId(userId: string) {
+  const result = await db.execute(sql`
+    SELECT id,
+           code,
+           plan_name,
+           user_id,
+           difficulty,
+           start_date,
+           end_date,
+           description,
+           completeness
+    FROM workout_plan
+    WHERE user_id = ${userId}
+    ORDER BY start_date DESC
+  `);
+  
+  return result.rows;
+}
 
 /** Resolve workout_plan to id (for internal use). */
 export async function resolveWorkoutPlanId(work_out_plan_code : string) {
