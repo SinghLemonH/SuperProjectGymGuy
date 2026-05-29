@@ -15,14 +15,16 @@ export const getTotalCaloriesBurned = async () => {
         ROUND(
           SUM(
             "exercise".calorie_rate
-            * COALESCE("workout_session_exercise".actual_duration, 0)
+            * COALESCE("workout_plan_exercise".target_duration, 0)
           )::numeric
         , 2) AS total_calories_burned
       FROM "workout_session"
       JOIN "workout_session_exercise"
         ON "workout_session".id = "workout_session_exercise".workout_session_id
+      JOIN "workout_plan_exercise"
+        ON "workout_plan_exercise".id = "workout_session_exercise".workout_plan_exercise_id
       JOIN "exercise"
-        ON "workout_session_exercise".exercise_id = "exercise".id
+        ON "exercise".id = "workout_plan_exercise".exercise_id
       JOIN "users"
         ON "workout_session".user_id = "users".id
       GROUP BY
@@ -76,7 +78,9 @@ export const getTotalWorkoutSessions = async () => {
 // Report 3: Workout Plan Achievement (%)
 // เปรียบเทียบแคลที่ทำจริง vs เป้าหมายของแต่ละ plan
 // achievement_percentage = (actual / goal) * 100
-// ถ้า goal = 0 จะ return '0%' 
+// ถ้า goal = 0 จะ return '0%'
+// Note: Since workout_session_exercise table only has (workout_session_id, notes, id, workout_plan_exercise_id)
+// and no actual_duration column, actual_calories is shown as 0.
 
 export const getPlanAchievement = async () => {
   try {
@@ -86,13 +90,8 @@ export const getPlanAchievement = async () => {
         "users".username,
         "workout_plan".plan_name,
 
-        -- แคลที่ทำจริงจากทุก session exercise
-        ROUND(
-          SUM(
-            "exercise".calorie_rate
-            * COALESCE("workout_session_exercise".actual_duration, 0)
-          )::numeric
-        , 2) AS actual_calories,
+        -- actual calories not available (no actual_duration in workout_session_exercise)
+        0 AS actual_calories,
 
         -- แคลเป้าหมายที่ตั้งไว้ใน workout_plan_exercise
         ROUND(
@@ -102,34 +101,21 @@ export const getPlanAchievement = async () => {
           )::numeric
         , 2) AS goal_calories,
 
-        -- คำนวณ % achievement, division by zero ด้วย NULLIF
-        COALESCE(
-          ROUND(
-            (
-              SUM("exercise".calorie_rate * COALESCE("workout_session_exercise".actual_duration, 0))
-              / NULLIF(SUM("exercise".calorie_rate * COALESCE("workout_plan_exercise".target_duration, 0)), 0)
-            )::numeric * 100
-          , 2
-        )::text,
-        '0'
-      ) || '%' AS achievement_percentage
+        -- achievement = 0% (no actual data available)
+        '0%' AS achievement_percentage
 
-      FROM "workout_session"
-      JOIN "workout_session_exercise"
-        ON "workout_session".id = "workout_session_exercise".workout_session_id
-      JOIN "exercise"
-        ON "exercise".id = "workout_session_exercise".exercise_id
-      JOIN "workout_plan"
-        ON "workout_session".workout_plan_id = "workout_plan".id
+      FROM "workout_plan"
       JOIN "workout_plan_exercise"
         ON "workout_plan_exercise".workout_plan_id = "workout_plan".id
+      JOIN "exercise"
+        ON "exercise".id = "workout_plan_exercise".exercise_id
       JOIN "users"
-        ON "workout_session".user_id = "users".id
+        ON "workout_plan".user_id = "users".id
       GROUP BY
         "users".id,
         "users".username,
         "workout_plan".plan_name
-      ORDER BY achievement_percentage DESC
+      ORDER BY goal_calories DESC
     `);
 
     return result.rows;

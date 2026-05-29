@@ -24,7 +24,7 @@ export const getTotalCaloriesBurnedReport = async (
 ) => {
   try {
     const result = await getTotalCaloriesBurned();
-    return res.status(200).json(result);
+    return res.status(200).json({ data: result });
   } catch (error: any) {
     return handleError(error, res);
   }
@@ -38,7 +38,7 @@ export const getTotalWorkoutSessionsReport = async (
 ) => {
   try {
     const result = await getTotalWorkoutSessions();
-    return res.status(200).json(result);
+    return res.status(200).json({ data: result });
   } catch (error: any) {
     return handleError(error, res);
   }
@@ -52,7 +52,7 @@ export const getPlanAchievementReport = async (
 ) => {
   try {
     const result = await getPlanAchievement();
-    return res.status(200).json(result);
+    return res.status(200).json({ data: result });
   } catch (error: any) {
     return handleError(error, res);
   }

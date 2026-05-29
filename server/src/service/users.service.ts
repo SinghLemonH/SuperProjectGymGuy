@@ -39,7 +39,7 @@ export const getUserDashboard = async (id: string) => {
 
     //cal total calories burned
     const caloriesResult = await db.execute(sql`
-        SELECT COALESCE(SUM(wse.actual_duration * e.calorie_rate), 0) AS total_calories
+        SELECT COALESCE(SUM(wpe.target_duration * e.calorie_rate), 0) AS total_calories
         FROM workout_session ws
         JOIN workout_session_exercise wse ON wse.workout_session_id = ws.id
         JOIN workout_plan_exercise wpe ON wpe.id = wse.workout_plan_exercise_id
@@ -76,13 +76,13 @@ export const getUserDashboard = async (id: string) => {
 //GET /users/:id/leaderboard
 export const getUserLeaderboard = async (id: string) => {
 
-    //top 10 users by total calories this mount
+        //top 10 users by total calories this mount
   const leaderboardResult = await db.execute(sql`
     SELECT 
         u.id,
         u.username,
         u.user_level,
-        COALESCE(SUM(wse.actual_duration * e.calorie_rate), 0) AS total_calories
+        COALESCE(SUM(wpe.target_duration * e.calorie_rate), 0) AS total_calories
     FROM users u
     LEFT JOIN workout_session ws ON ws.user_id = u.id
         AND DATE_TRUNC('month', ws.session_datetime) = DATE_TRUNC('month', NOW())
@@ -98,7 +98,7 @@ const rankResult = await db.execute(sql`
     SELECT rank FROM (
         SELECT 
             u.id,
-            RANK() OVER (ORDER BY COALESCE(SUM(wse.actual_duration * e.calorie_rate), 0) DESC) AS rank
+            RANK() OVER (ORDER BY COALESCE(SUM(wpe.target_duration * e.calorie_rate), 0) DESC) AS rank
         FROM users u
         LEFT JOIN workout_session ws ON ws.user_id = u.id
             AND DATE_TRUNC('month', ws.session_datetime) = DATE_TRUNC('month', NOW())

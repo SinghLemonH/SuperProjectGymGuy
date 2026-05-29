@@ -49,6 +49,7 @@ export const leaderboardConsistencyCalories = async (req: Request, res: Response
         });
         return res.status(200).json(result);
     } catch (error: any) {
+        console.log("LEADERBOARD ERROR:", error);
         if (error.status) return res.status(error.status).json({ error_code: error.error_code, message: error.message });
         return res.status(500).json({ error_code: "SERVER_ERROR", message: "Internal server error" });
     }

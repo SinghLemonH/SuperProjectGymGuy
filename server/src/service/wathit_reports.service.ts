@@ -25,8 +25,8 @@ export async function getExerciseCalories() {
 
       COUNT(DISTINCT ws.id) AS total_session,
 
-      COALESCE(
-        SUM(e.calorie_rate),
+            COALESCE(
+        SUM(e.calorie_rate * COALESCE(wpe.target_duration, 0)),
         0
       ) AS exercise_calories_burned
 
@@ -58,13 +58,13 @@ export async function getTotalEnergy() {
 
       u.bmr,
 
-      COALESCE(
-        SUM(e.calorie_rate),
+            COALESCE(
+        SUM(e.calorie_rate * COALESCE(wpe.target_duration, 0)),
         0
       ) AS exercise_calories,
 
       (
-        u.bmr + COALESCE(SUM(e.calorie_rate), 0)
+        u.bmr + COALESCE(SUM(e.calorie_rate * COALESCE(wpe.target_duration, 0)), 0)
       ) AS total_energy_burned
 
     FROM users u

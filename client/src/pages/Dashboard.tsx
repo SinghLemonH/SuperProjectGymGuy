@@ -25,7 +25,7 @@ export default function Dashboard() {
             try {
                 const [profileData, scoreData, calData, sessionData] = await Promise.all([
                     userDashBoard(user.id),
-                    totalScoreDashboard(),
+                    totalScoreDashboard(user.id),
                     leaderboardDashboard(user.username),
                     workoutSessionsDashboard(user.id)
                 ])
