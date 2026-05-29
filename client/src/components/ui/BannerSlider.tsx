@@ -2,13 +2,13 @@ import { useState, useEffect, type ReactNode } from 'react'
 
 interface Slide {
   id: number
-  label: string
-  labelColor: string
+  tag: string
   title: string
-  titleColor: string
   desc: string
-  descColor: string
   bg: string
+  tagColor: string
+  titleColor: string
+  descColor: string
   iconBg: string
   icon: ReactNode
 }
@@ -16,12 +16,16 @@ interface Slide {
 const SLIDES: Slide[] = [
   {
     id: 1,
-    label: 'โปรโมชัน', labelColor: 'text-[#534AB7]',
-    title: 'Whey Protein Gold Standard', titleColor: 'text-[#26215C]',
-    desc: 'ลด 20% เฉพาะสมาชิก GymGUY', descColor: 'text-[#534AB7]',
-    bg: 'bg-[#EEEDFE]', iconBg: 'bg-[#CECBF6]',
+    tag: 'Promotion',
+    title: 'Whey Protein Gold Standard',
+    desc: '20% off for GymGUY members this week only',
+    bg: 'bg-[#EEEDFE]',
+    tagColor: 'text-[#534AB7]',
+    titleColor: 'text-[#26215C]',
+    descColor: 'text-[#534AB7]',
+    iconBg: 'bg-[#CECBF6]',
     icon: (
-      <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+      <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
         <rect x="6" y="16" width="28" height="10" rx="5" fill="#534AB7"/>
         <rect x="2" y="19" width="5" height="4" rx="2" fill="#7F77DD"/>
         <rect x="33" y="19" width="5" height="4" rx="2" fill="#7F77DD"/>
@@ -30,12 +34,16 @@ const SLIDES: Slide[] = [
   },
   {
     id: 2,
-    label: 'ข่าวสาร', labelColor: 'text-[#0F6E56]',
-    title: 'Challenge เดือนพฤษภาคม', titleColor: 'text-[#04342C]',
-    desc: 'วิ่ง 100km ภายใน 30 วัน รับ badge พิเศษ', descColor: 'text-[#0F6E56]',
-    bg: 'bg-[#E1F5EE]', iconBg: 'bg-[#9FE1CB]',
+    tag: 'Challenge',
+    title: 'May Monthly Challenge',
+    desc: 'Run 100km in 30 days and earn an exclusive badge',
+    bg: 'bg-[#E1F5EE]',
+    tagColor: 'text-[#0F6E56]',
+    titleColor: 'text-[#04342C]',
+    descColor: 'text-[#0F6E56]',
+    iconBg: 'bg-[#9FE1CB]',
     icon: (
-      <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+      <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
         <circle cx="20" cy="20" r="14" stroke="#0F6E56" strokeWidth="2.5"/>
         <path d="M14 20l5 5 8-8" stroke="#0F6E56" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
@@ -43,12 +51,16 @@ const SLIDES: Slide[] = [
   },
   {
     id: 3,
-    label: 'สินค้าใหม่', labelColor: 'text-[#854F0B]',
-    title: 'Resistance Band Pro Set', titleColor: 'text-[#412402]',
-    desc: 'เสริมกล้ามเนื้อ ใช้ได้ทุกระดับ', descColor: 'text-[#854F0B]',
-    bg: 'bg-[#FAEEDA]', iconBg: 'bg-[#FAC775]',
+    tag: 'New Product',
+    title: 'Resistance Band Pro Set',
+    desc: 'Build strength at any level — home or gym',
+    bg: 'bg-[#FAEEDA]',
+    tagColor: 'text-[#854F0B]',
+    titleColor: 'text-[#412402]',
+    descColor: 'text-[#854F0B]',
+    iconBg: 'bg-[#FAC775]',
     icon: (
-      <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+      <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
         <path d="M8 20c0-4 2-7 4-7s4 7 8 7 4-7 8-7 4 3 4 7" stroke="#854F0B" strokeWidth="2.5" strokeLinecap="round"/>
       </svg>
     ),
@@ -66,41 +78,55 @@ export default function BannerSlider() {
   const s = SLIDES[cur]
 
   return (
-    <div className={`relative rounded-xl overflow-hidden mb-4 h-[120px] ${s.bg} transition-colors duration-300`}>
-      <div className="flex items-center h-full px-5 gap-4">
-        <div className="flex-1">
-          <p className={`text-[10px] font-medium uppercase tracking-wider mb-1 ${s.labelColor}`}>{s.label}</p>
-          <p className={`text-base font-medium mb-0.5 ${s.titleColor}`}>{s.title}</p>
-          <p className={`text-xs ${s.descColor}`}>{s.desc}</p>
+    <div className={`relative rounded-2xl overflow-hidden mb-6 ${s.bg} transition-colors duration-300`}>
+      <div className="flex items-center px-6 py-5 gap-5">
+
+        {/* Text */}
+        <div className="flex-1 min-w-0">
+          <span className={`inline-block text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full bg-white/50 mb-2 ${s.tagColor}`}>
+            {s.tag}
+          </span>
+          <p className={`text-sm font-semibold leading-snug mb-1 truncate ${s.titleColor}`}>
+            {s.title}
+          </p>
+          <p className={`text-xs leading-relaxed line-clamp-2 ${s.descColor}`}>
+            {s.desc}
+          </p>
         </div>
-        <div className={`w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0 ${s.iconBg}`}>
+
+        {/* Icon */}
+        <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${s.iconBg}`}>
           {s.icon}
         </div>
+
       </div>
 
-      {/* arrows */}
-      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1.5">
-        {[-1, 1].map((d, i) => (
-          <button
-            key={i}
-            onClick={() => setCur(c => (c + d + SLIDES.length) % SLIDES.length)}
-            className="w-6 h-6 rounded-full bg-white/70 hover:bg-white flex items-center justify-center text-gray-600 text-xs transition-colors"
-          >
-            {d === -1 ? '←' : '→'}
-          </button>
-        ))}
-      </div>
-
-      {/* dots */}
-      <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1.5">
+      {/* Dots */}
+      <div className="flex justify-center gap-1.5 pb-3">
         {SLIDES.map((_, i) => (
           <button
             key={i}
             onClick={() => setCur(i)}
-            className={`w-1.5 h-1.5 rounded-full transition-all ${i === cur ? 'bg-gray-600 w-3' : 'bg-gray-400/50'}`}
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              i === cur ? 'w-4 bg-gray-500' : 'w-1.5 bg-gray-300'
+            }`}
           />
         ))}
       </div>
+
+      {/* Arrows */}
+      <button
+        onClick={() => setCur(c => (c - 1 + SLIDES.length) % SLIDES.length)}
+        className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/60 hover:bg-white flex items-center justify-center text-gray-500 text-xs transition-colors"
+      >
+        ←
+      </button>
+      <button
+        onClick={() => setCur(c => (c + 1) % SLIDES.length)}
+        className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/60 hover:bg-white flex items-center justify-center text-gray-500 text-xs transition-colors"
+      >
+        →
+      </button>
     </div>
   )
 }

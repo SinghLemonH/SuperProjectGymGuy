@@ -1,5 +1,5 @@
 // pages/Leaderboard.tsx
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { getUser } from '../api/auth'
 import { leaderboardDashboard, userDetailDashboard } from '../api/user.api'
 import StatsCard from '../components/ui/StatsCard'
@@ -15,29 +15,40 @@ export default function Leaderboard() {
     const [leaderboardData, setLeaderboard] = useState<LeaderboardsIn | undefined>(undefined)
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
+    const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-    const load = useCallback(async () => {
-        if (!user) return
+    useEffect(() => {
+    if (!user) {
+        setLoading(false)
+        setErrorMsg('Please log in to view the leaderboard.')
+        return
+    }
 
+    const loadData = async () => {
         try {
             // list all leaderboard
             const lbData = await leaderboardDashboard()
-            const userIds = lbData.data.map((row) => row.user_id)
+            const userIds = (lbData?.data ?? []).map((row) => row.user_id)
 
             // fetch user details for all users in the leaderboard
-            const userData = await Promise.all(userIds.map((id) => userDetailDashboard(id)))
+            // Use allSettled so one failure doesn't break everything
+            const userResults = await Promise.allSettled(userIds.map((id) => userDetailDashboard(id)))
+            const userData = userResults
+                .filter((r): r is PromiseFulfilledResult<UserDetailIn> => r.status === 'fulfilled')
+                .map((r) => r.value)
+
             setLeaderboard(lbData)
             setUserDetail(userData)
         } catch (err) {
             console.error('Leaderboard load failed:', err)
+            setErrorMsg('Failed to load leaderboard.')
         } finally {
             setLoading(false)
         }
-    }, [user])
+    }
 
-    useEffect(() => {
-        load()
-    }, [load])
+    loadData()
+    }, [user?.id])
 
     const myEntry = leaderboardData?.data.find(e => e.user_id === user?.id)
     const filtered = search
@@ -50,8 +61,8 @@ export default function Leaderboard() {
     )
 
         if (loading) return <p>Loading...</p>
-
-    if (!leaderboardData) return <p>Failed to load.</p>
+    if (errorMsg) return <p className="text-red-500">{errorMsg}</p>
+    if (!leaderboardData) return <p className="text-red-500">Failed to load leaderboard data.</p>
 
     return (
         <>
@@ -93,7 +104,7 @@ export default function Leaderboard() {
                                 </div>
                             </div>
                             <div className="text-right text-sm text-gray-500">
-                                <p>{entry.calories.toLocaleString()} kcal</p>
+                                <p>{entry.calories?.toLocaleString() ?? '0'} kcal</p>
                                 <p>{entry.consistency} day streak</p>
                                 <p>{userDetailMap[entry.user_id]?.fitness_goal ?? '--'} fitness goal</p>
                             </div>

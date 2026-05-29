@@ -20,23 +20,19 @@ import KittireportsRoutes   from "./routes/Est_Report.route";
 import WichitreportRoutes   from "./routes/reportWichitchai.routes";
 import ApichreportRoutes    from "./routes/may_report.route";
 
-
-
-
-
 const app = express();
 
 // ─── Middleware ────────────────────────────────────────────────
 app.use(express.json());
-app.use(cors({ origin: "http://localhost:5173" })); 
+app.use(cors({ origin: ["http://localhost:5173", "http://localhost:5174"] })); 
 
 // ─── Routes ────────────────────────────────────────────────────────
 app.use("/api/v1/auth",      authRoutes);
 app.use("/api/v1/users",     userRoutes);
+app.use("/api/v1",           workoutSessionRoutes);
 app.use("/api/v1/exercises", exercisesRoutes);
 app.use("/api/v1/muscles",   musclesRoutes);
-app.use("/api/v1",           workoutSessionRoutes);
-app.use("/api/v1/workout-plans", workoutPlanRoutes);
+app.use("/api/v1",           workoutPlanRoutes);
 
 // ─── Reports ───────────────────────────────────────────────────────
 app.use("/api/v1/reports",   WathitreportsRoutes);

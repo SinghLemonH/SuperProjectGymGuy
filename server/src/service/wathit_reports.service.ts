@@ -11,7 +11,8 @@ export async function getUserBMR() {
       height,
       sex,
       bmr AS bmr_kcal_per_day
-    FROM users
+        FROM users
+    ORDER BY username ASC
   `);
 
   return result.rows;
@@ -25,8 +26,8 @@ export async function getExerciseCalories() {
 
       COUNT(DISTINCT ws.id) AS total_session,
 
-      COALESCE(
-        SUM(e.calorie_rate),
+            COALESCE(
+        SUM(e.calorie_rate * COALESCE(wpe.target_duration, 0)),
         0
       ) AS exercise_calories_burned
 
@@ -45,6 +46,7 @@ export async function getExerciseCalories() {
       ON e.id = wpe.exercise_id
 
     GROUP BY u.id, u.username
+    ORDER BY username ASC
   `);
 
   return result.rows;
@@ -58,13 +60,13 @@ export async function getTotalEnergy() {
 
       u.bmr,
 
-      COALESCE(
-        SUM(e.calorie_rate),
+            COALESCE(
+        SUM(e.calorie_rate * COALESCE(wpe.target_duration, 0)),
         0
       ) AS exercise_calories,
 
       (
-        u.bmr + COALESCE(SUM(e.calorie_rate), 0)
+        u.bmr + COALESCE(SUM(e.calorie_rate * COALESCE(wpe.target_duration, 0)), 0)
       ) AS total_energy_burned
 
     FROM users u
@@ -82,6 +84,7 @@ export async function getTotalEnergy() {
       ON e.id = wpe.exercise_id
 
     GROUP BY u.id, u.username, u.bmr
+    ORDER BY username ASC
   `);
 
   return result.rows;

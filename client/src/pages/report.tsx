@@ -1,21 +1,15 @@
 import { useEffect, useState } from 'react'
 import type { WichitReportsIn, KittiReportsIn, WathitReportsIn, MayReportsIn } from '../api/report.api'
+import { Button, Input } from '../components/ui'
 import {
     exerPopularity, userWeightBMI, leaderboardConsisCal,
     userBMR, exerciseCaloriesBurned, totalEnergyBurned,
     scoreExerciseSummary, exerciseMusclePlanList, workoutDistribution,
     totalCaloriesBurned, totalWorkoutSessions, planAchievement
 } from '../api/report.api'
-import { getUser } from '../api/auth'
-
-function useUserId(): string | undefined {
-    return getUser()?.id ?? undefined
-}
 
 // ─── Shared CSS constants ────────────────────────────────────────────
 const selectCls = 'border rounded-md px-3 py-1.5 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#534AB7]'
-const inputCls  = selectCls
-const clearBtnCls = 'px-3 py-1.5 text-sm text-red-500 border border-red-300 rounded-md hover:bg-red-50'
 const thCls     = 'py-2 pr-4 text-left text-gray-500 font-medium'
 const tdCls     = 'py-2 pr-4'
 
@@ -30,7 +24,7 @@ function FilterBar({ children, onClear, active }: {
             <span className="text-sm font-medium text-gray-600 self-center">Filter:</span>
             {children}
             {active && (
-                <button onClick={onClear} className={clearBtnCls}>Clear</button>
+                <Button variant="ghost" size="sm" onClick={onClear}>Clear</Button>
             )}
         </div>
     )
@@ -44,14 +38,13 @@ function SearchInput({ value, onChange, placeholder }: {
 }) {
     const [local, setLocal] = useState(value ?? '')
     return (
-        <input
-            type="text"
+        <Input
             value={local}
             placeholder={placeholder}
             onChange={(e) => setLocal(e.target.value)}
             onBlur={() => onChange(local || undefined)}
             onKeyDown={(e) => { if (e.key === 'Enter') onChange(local || undefined) }}
-            className={inputCls}
+            className="max-w-[180px]"
         />
     )
 }
@@ -65,21 +58,23 @@ function Pagination({ page, totalPages, onPageChange }: {
     if (totalPages <= 1) return null
     return (
         <div className="flex items-center gap-2 mt-4 text-sm text-gray-600">
-            <button
+            <Button
+                variant="outline"
+                size="sm"
                 disabled={page <= 1}
                 onClick={() => onPageChange(page - 1)}
-                className="px-3 py-1.5 border rounded-md disabled:opacity-40 hover:bg-gray-50"
             >
                 Previous
-            </button>
+            </Button>
             <span>Page {page} of {totalPages}</span>
-            <button
+            <Button
+                variant="outline"
+                size="sm"
                 disabled={page >= totalPages}
                 onClick={() => onPageChange(page + 1)}
-                className="px-3 py-1.5 border rounded-md disabled:opacity-40 hover:bg-gray-50"
             >
                 Next
-            </button>
+            </Button>
         </div>
     )
 }
@@ -101,11 +96,13 @@ function ExercisePopularityTable() {
     const [exerciseList, setExerciseList] = useState<string[]>([])
     const [data, setData]             = useState<WichitReportsIn>()
 
-    // Fetch exercise name list once for dropdown
+        // Fetch exercise name list once for dropdown
     useEffect(() => {
         exerPopularity().then((res) => {
             const names = res.data.map((row) => row.exercise_name)
             setExerciseList(names)
+        }).catch(() => {
+            // Silently handle - dropdown will just be empty
         })
     }, [])
 
@@ -224,9 +221,9 @@ function UserWeightBMITable() {
             >
                 <SearchInput value={username} onChange={setUsername} placeholder="Search username..." />
                 <label className="text-sm text-gray-500 self-center">Joined from</label>
-                <input type="date" value={from_date ?? ''} onChange={(e) => setFromDate(e.target.value || undefined)} className={inputCls} />
+                <Input type="date" value={from_date ?? ''} onChange={(e) => setFromDate(e.target.value || undefined)} className="w-[140px]" />
                 <label className="text-sm text-gray-500 self-center">to</label>
-                <input type="date" value={to_date ?? ''} onChange={(e) => setToDate(e.target.value || undefined)} className={inputCls} />
+                <Input type="date" value={to_date ?? ''} onChange={(e) => setToDate(e.target.value || undefined)} className="w-[140px]" />
             </FilterBar>
 
             {data?.data.length === 0 ? <NoResults /> :
@@ -299,7 +296,7 @@ function LeaderboardConsistencyTable() {
                 onClear={() => { setUsername(undefined); setMonth(undefined); setSortBy(undefined); setOrder(undefined) }}
             >
                 <SearchInput value={username} onChange={setUsername} placeholder="Search username..." />
-                <input type="month" value={month ?? ''} onChange={(e) => setMonth(e.target.value || undefined)} className={inputCls} />
+                <Input type="month" value={month ?? ''} onChange={(e) => setMonth(e.target.value || undefined)} className="w-[160px]" />
                 <select value={sort_by ?? ''} onChange={(e) => setSortBy(e.target.value || undefined)} className={selectCls}>
                     <option value="">Sort by...</option>
                     <option value="calories">Calories</option>
@@ -519,28 +516,26 @@ function ScoreExerciseSummaryTable() {
     const [sortDir, setSortDir]      = useState<string>()
     const [page, setPage]            = useState(1)
     const [data, setData]            = useState<KittiReportsIn>()
-    const userId = useUserId()
 
     useEffect(() => {
         const load = async () => {
-            if (!userId) return
             setLoading(true)
             try {
-                const result = await scoreExerciseSummary(userId, code, start_date, end_date, page, 10, sortDir)
+                const result = await scoreExerciseSummary(code, start_date, end_date, page, 10, sortDir)
                 setData(result)
             } catch (err) {
                 console.error('Score exercise summary load failed:', err)
+                setData({ data: [], page: 1, limit: 10, total: 0, totalPages: 0 })
             } finally {
                 setLoading(false)
             }
         }
         load()
-    }, [userId, code, start_date, end_date, sortDir, page])
+    }, [code, start_date, end_date, sortDir, page])
 
     // Reset to page 1 when filters change
     useEffect(() => { setPage(1) }, [code, start_date, end_date, sortDir])
 
-    if (!userId) return <p>Please log in to view this report.</p>
     if (loading) return <p>Loading...</p>
 
     return (
@@ -551,9 +546,9 @@ function ScoreExerciseSummaryTable() {
             >
                 <SearchInput value={code} onChange={setCode} placeholder="Workout plan code..." />
                 <label className="text-sm text-gray-500 self-center">From</label>
-                <input type="date" value={start_date ?? ''} onChange={(e) => setStartDate(e.target.value || undefined)} className={inputCls} />
+                <Input type="date" value={start_date ?? ''} onChange={(e) => setStartDate(e.target.value || undefined)} className="w-[140px]" />
                 <label className="text-sm text-gray-500 self-center">To</label>
-                <input type="date" value={end_date ?? ''} onChange={(e) => setEndDate(e.target.value || undefined)} className={inputCls} />
+                <Input type="date" value={end_date ?? ''} onChange={(e) => setEndDate(e.target.value || undefined)} className="w-[140px]" />
                 <select value={sortDir ?? ''} onChange={(e) => setSortDir(e.target.value || undefined)} className={selectCls}>
                     <option value="">Sort...</option>
                     <option value="asc">Ascending</option>
@@ -561,11 +556,12 @@ function ScoreExerciseSummaryTable() {
                 </select>
             </FilterBar>
 
-            {data?.data.length === 0 ? <NoResults /> :
+                {!data || data.data.length === 0 ? <NoResults /> :
                 <>
-                    <table className="w-full text-sm">
+                                        <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b">
+                                <th className={thCls}>Username</th>
                                 <th className={thCls}>Plan Code</th>
                                 <th className={thCls}>Plan Name</th>
                                 <th className={thCls}>Exercise Code</th>
@@ -577,6 +573,7 @@ function ScoreExerciseSummaryTable() {
                         <tbody>
                             {data?.data.map((row, i) => (
                                 <tr key={i} className="border-b hover:bg-gray-50">
+                                    <td className={tdCls}>{row.username}</td>
                                     <td className={tdCls}>{row.workout_plan_code}</td>
                                     <td className={tdCls}>{row.workout_plan_name}</td>
                                     <td className={tdCls}>{row.exercise_code}</td>
@@ -604,27 +601,25 @@ function ExerciseMusclePlanTable() {
     const [sortDir, setSortDir]    = useState<string>()
     const [page, setPage]          = useState(1)
     const [data, setData]          = useState<KittiReportsIn>()
-    const userId = useUserId()
 
     useEffect(() => {
         const load = async () => {
-            if (!userId) return
             setLoading(true)
             try {
-                const result = await exerciseMusclePlanList(userId, muscle_area, page, 10, sortDir)
+                const result = await exerciseMusclePlanList(muscle_area, page, 10, sortDir)
                 setData(result)
             } catch (err) {
                 console.error('Exercise muscle plan load failed:', err)
+                setData({ data: [], page: 1, limit: 10, total: 0, totalPages: 0 })
             } finally {
                 setLoading(false)
             }
         }
         load()
-    }, [userId, muscle_area, sortDir, page])
+    }, [muscle_area, sortDir, page])
 
     useEffect(() => { setPage(1) }, [muscle_area, sortDir])
 
-    if (!userId) return <p>Please log in to view this report.</p>
     if (loading) return <p>Loading...</p>
 
     return (
@@ -650,9 +645,10 @@ function ExerciseMusclePlanTable() {
 
             {data?.data.length === 0 ? <NoResults /> :
                 <>
-                    <table className="w-full text-sm">
+                                        <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b">
+                                <th className={thCls}>Username</th>
                                 <th className={thCls}>Plan Code</th>
                                 <th className={thCls}>Plan Name</th>
                                 <th className={thCls}>Start Date</th>
@@ -665,6 +661,7 @@ function ExerciseMusclePlanTable() {
                         <tbody>
                             {data?.data.map((row, i) => (
                                 <tr key={i} className="border-b hover:bg-gray-50">
+                                    <td className={tdCls}>{row.username}</td>
                                     <td className={tdCls}>{row.workout_plan_code}</td>
                                     <td className={tdCls}>{row.workout_plan_name}</td>
                                     <td className={tdCls}>{row.start_date ? new Date(row.start_date).toLocaleDateString() : '-'}</td>
@@ -692,27 +689,25 @@ function WorkoutDistributionTable() {
     const [sortDir, setSortDir] = useState<string>()
     const [page, setPage]       = useState(1)
     const [data, setData]       = useState<KittiReportsIn>()
-    const userId = useUserId()
 
     useEffect(() => {
         const load = async () => {
-            if (!userId) return
             setLoading(true)
             try {
-                const result = await workoutDistribution(userId, page, 10, sortDir)
+                const result = await workoutDistribution(page, 10, sortDir)
                 setData(result)
             } catch (err) {
                 console.error('Workout distribution load failed:', err)
+                setData({ data: [], page: 1, limit: 10, total: 0, totalPages: 0 })
             } finally {
                 setLoading(false)
             }
         }
         load()
-    }, [userId, sortDir, page])
+    }, [sortDir, page])
 
     useEffect(() => { setPage(1) }, [sortDir])
 
-    if (!userId) return <p>Please log in to view this report.</p>
     if (loading) return <p>Loading...</p>
 
     return (
@@ -730,9 +725,10 @@ function WorkoutDistributionTable() {
 
             {data?.data.length === 0 ? <NoResults /> :
                 <>
-                    <table className="w-full text-sm">
+                                        <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b">
+                                <th className={thCls}>Username</th>
                                 <th className={thCls}>Plan Code</th>
                                 <th className={thCls}>Plan Name</th>
                                 <th className={thCls}>Start Date</th>
@@ -744,6 +740,7 @@ function WorkoutDistributionTable() {
                         <tbody>
                             {data?.data.map((row, i) => (
                                 <tr key={i} className="border-b hover:bg-gray-50">
+                                    <td className={tdCls}>{row.username}</td>
                                     <td className={tdCls}>{row.workout_plan_code}</td>
                                     <td className={tdCls}>{row.workout_plan_name}</td>
                                     <td className={tdCls}>{row.start_date ? new Date(row.start_date).toLocaleDateString() : '-'}</td>
