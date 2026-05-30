@@ -17,16 +17,17 @@ import { apiFetch } from "./fetchWithAuth";
 // ─── Client-facing types (camelCase) ───────────────────────────────────────────
 
 export interface WorkoutPlanExercise {
-  id: string;                      // synthesized (backend has no per-row id in detail)
-  exerciseId: string;              // UUID ของ exercise จริงๆ สำหรับส่ง backend
+  id: string;                      // line-item row id (workout_plan_exercise.id)
+  exerciseId: string;              // the exercise uuid (needed to log a session)
   exerciseName: string;
   category?: string;
   targetSets: number | null;
-  targetReps: number | null;       // not returned by backend -> null
+  targetReps: number | null;
   targetDuration: number | null;
   targetWeight: number | null;
   note: string | null;
-  dateNumber: number;              // backend has no day grouping -> defaults to 1
+  dateNumber: number;              // which workout day this exercise belongs to
+  completed: boolean;              // already logged in a session?
 }
 
 export interface WorkoutPlan {
@@ -47,26 +48,39 @@ export interface WorkoutPlanListResponse {
   total?: number;
 }
 
+// One chosen exercise when creating/updating a plan.
+export interface CreatePlanExercise {
+  exerciseId: string;
+  targetSets: number;
+  targetReps?: number;
+  targetDuration?: number;
+  targetWeight?: number;
+  note?: string;
+  dateNumber?: number;
+}
+
 export interface CreateWorkoutPlanPayload {
   planName: string;
   startDate: string;
   endDate: string;
   description?: string;
   difficulty?: number;
+  lineItems?: CreatePlanExercise[];   // exercises picked in the modal
 }
 
 // ─── Raw backend shapes (snake_case) ────────────────────────────────────────────
 
 interface RawListPlan {
   id: string;
-  code: string;
-  plan_name: string;
-  user_id: string;
+  workout_plan_code: string;
+  workout_plan_name: string;
+  username?: string;
   difficulty: number | string | null;
   start_date: string;
   end_date: string;
   description: string | null;
   completeness: number | string | null;
+  exercise_count?: number | string | null;
 }
 
 interface RawDetailHeader {
@@ -80,7 +94,8 @@ interface RawDetailHeader {
 }
 
 interface RawLineItem {
-  exercise_id: string;
+  line_item_id?: string;
+  exercise_id?: string;
   exercise_code: string;
   exercise_name: string;
   exercise_category: string | null;
@@ -88,9 +103,12 @@ interface RawLineItem {
   calorie_rate: number | null;
   score_based: number | null;
   target_sets: number | null;
+  target_reps: number | null;
   target_duration: number | null;
   target_weight: number | null;
   note: string | null;
+  date_number: number | null;
+  completed?: boolean | null;
 }
 
 interface RawDetailResponse {
@@ -107,35 +125,42 @@ const num = (v: unknown, fallback = 0): number => {
 
 const mapListPlan = (r: RawListPlan): WorkoutPlan => ({
   id: r.id,
-  code: r.code,
-  planName: r.plan_name,
+  code: r.workout_plan_code,
+  planName: r.workout_plan_name,
   difficulty: num(r.difficulty),
   startDate: r.start_date,
   endDate: r.end_date,
   description: r.description,
   completeness: num(r.completeness),
+  exerciseCount: r.exercise_count != null ? num(r.exercise_count) : undefined,
 });
 
 const mapLineItem = (li: RawLineItem, i: number): WorkoutPlanExercise => ({
-  id: `${li.exercise_code ?? "ex"}-${i}`,
-  exerciseId: li.exercise_id,
+  id: li.line_item_id ?? `${li.exercise_code ?? "ex"}-${i}`,
+  exerciseId: li.exercise_id ?? "",
   exerciseName: li.exercise_name,
   category: li.exercise_category ?? undefined,
   targetSets: li.target_sets ?? null,
-  targetReps: null,
+  targetReps: li.target_reps ?? null,
   targetDuration: li.target_duration ?? null,
   targetWeight: li.target_weight ?? null,
   note: li.note ?? null,
-  dateNumber: 1,
+  dateNumber: li.date_number ?? 1,
+  completed: li.completed === true,
 });
 
 // ─── API calls ──────────────────────────────────────────────────────────────────
 
-/** All plans for a user. Uses the existing GET /users/:id/workout-plans endpoint. */
-export const getUserPlans = async (userId: string): Promise<WorkoutPlanListResponse> => {
-  const res = await apiFetch<{ data: RawListPlan[]; total?: number }>(
-    `/users/${userId}/workout-plans`
-  );
+/**
+ * All workout plans that exist in the database (every user's plans), including
+ * each plan's exercise count. Uses the existing GET /api/v1/ list endpoint.
+ *
+ * NOTE: `userId` is kept for call-site compatibility but is intentionally
+ * ignored — we show every plan in Supabase. To restrict to the logged-in user
+ * again, switch the call back to `/users/${userId}/workout-plans`.
+ */
+export const getUserPlans = async (_userId?: string): Promise<WorkoutPlanListResponse> => {
+  const res = await apiFetch<{ data: RawListPlan[]; total?: number }>(`?limit=1000`);
   return {
     data: (res.data ?? []).map(mapListPlan),
     total: res.total,
@@ -177,7 +202,16 @@ export const createWorkoutPlan = (payload: CreateWorkoutPlanPayload): Promise<Wo
       end_date: payload.endDate,
       description: payload.description ?? "",
       difficulty: payload.difficulty ?? 1,
-      line_items: [],
+      // map the chosen exercises to the snake_case shape the backend expects
+      line_items: (payload.lineItems ?? []).map((li) => ({
+        exercise_id: li.exerciseId,
+        target_sets: li.targetSets,
+        ...(li.targetReps != null ? { target_reps: li.targetReps } : {}),
+        ...(li.targetDuration != null ? { target_duration: li.targetDuration } : {}),
+        ...(li.targetWeight != null ? { target_weight: li.targetWeight } : {}),
+        ...(li.note ? { note: li.note } : {}),
+        date_number: li.dateNumber ?? 1,
+      })),
     }),
   });
 
@@ -197,3 +231,38 @@ export const updateWorkoutPlan = (
 
 export const deleteWorkoutPlan = (idOrCode: string): Promise<void> =>
   apiFetch(`/${idOrCode}`, { method: "DELETE" });
+
+// ─── Finish a workout session ────────────────────────────────────────────────
+// Logs the completed exercises of a plan. The backend session schema expects
+// workout_plan_exercise_id (the line-item id, NOT the exercise id) plus
+// positive actualReps/actualDuration. Endpoint: POST /api/v1/workout-sessions.
+
+export interface FinishSessionItem {
+  workoutPlanExerciseId: string;   // = WorkoutPlanExercise.id
+  reps?: number;
+  durationSec?: number;
+  sets?: number;
+  note?: string;
+}
+
+export const finishWorkoutSession = (params: {
+  userId: string;
+  workoutPlanId: string;
+  items: FinishSessionItem[];
+}): Promise<unknown> =>
+  apiFetch("/workout-sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: params.userId,
+      workout_plan_id: params.workoutPlanId,
+      session_datetime: new Date().toISOString(),
+      exercises: params.items.map((it) => ({
+        workout_plan_exercise_id: it.workoutPlanExerciseId,
+        // backend requires these to be positive integers
+        actualReps: it.reps && it.reps > 0 ? it.reps : 1,
+        actualDuration: it.durationSec && it.durationSec > 0 ? it.durationSec : 1,
+        ...(it.sets && it.sets > 0 ? { actualSet: it.sets } : {}),
+        ...(it.note ? { notes: it.note } : {}),
+      })),
+    }),
+  });

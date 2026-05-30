@@ -7,7 +7,9 @@ import {
   deleteWorkoutPlan,
   type WorkoutPlan,
   type CreateWorkoutPlanPayload,
+  type CreatePlanExercise,
 } from "../api/plan.api";
+import { getExercises, type ExerciseListItem } from "../api/exercise.api";
 import { getUser } from "../api/auth";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -28,7 +30,6 @@ const getStatus = (pct: number) => {
 const barColor = (pct: number) =>
   pct >= 100 ? "#0f766e" : pct > 0 ? "#6366f1" : "#e5e7eb";
 
-// dynamic colors for tags based on words
 const getDescTagStyle = (desc: string) => {
   const d = desc.toLowerCase();
   if (d.includes("muscle") || d.includes("strength")) return { bg: "#ede9fe", color: "#6d28d9" };
@@ -47,6 +48,15 @@ interface PlanModalProps {
   onSaved: () => void;
 }
 
+// One picked exercise row inside the modal
+interface PickedExercise {
+  exerciseId: string;
+  exerciseName: string;
+  targetSets: number;
+  targetReps: number;
+  dateNumber: number;   // which day this exercise belongs to (1-7)
+}
+
 function PlanModal({ mode, initial, onClose, onSaved }: PlanModalProps) {
   const [form, setForm] = useState<CreateWorkoutPlanPayload>({
     planName:    initial?.planName    ?? "",
@@ -58,8 +68,35 @@ function PlanModal({ mode, initial, onClose, onSaved }: PlanModalProps) {
   const [saving, setSaving] = useState(false);
   const [err, setErr]       = useState<string | null>(null);
 
+  // ── exercise picker state (create mode only) ──
+  const [available, setAvailable] = useState<ExerciseListItem[]>([]);
+  const [picked, setPicked]       = useState<PickedExercise[]>([]);
+  const [toAdd, setToAdd]         = useState<string>("");
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    getExercises("page=1&limit=100")   // limit max is 100 on the backend
+      .then((res: any) => setAvailable(res?.data ?? []))
+      .catch(() => setAvailable([]));
+  }, [mode]);
+
   const set = (k: keyof CreateWorkoutPlanPayload, v: string | number) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  const addExercise = () => {
+    if (!toAdd) return;
+    if (picked.some((p) => p.exerciseId === toAdd)) { setToAdd(""); return; }
+    const ex = available.find((e) => e.id === toAdd);
+    if (!ex) return;
+    setPicked((prev) => [...prev, { exerciseId: ex.id, exerciseName: ex.name, targetSets: 3, targetReps: 10, dateNumber: 1 }]);
+    setToAdd("");
+  };
+
+  const updatePicked = (id: string, key: "targetSets" | "targetReps" | "dateNumber", value: number) =>
+    setPicked((prev) => prev.map((p) => (p.exerciseId === id ? { ...p, [key]: value } : p)));
+
+  const removePicked = (id: string) =>
+    setPicked((prev) => prev.filter((p) => p.exerciseId !== id));
 
   const validate = () => {
     if (!form.planName.trim())  { setErr("Plan name is required.");  return false; }
@@ -68,6 +105,8 @@ function PlanModal({ mode, initial, onClose, onSaved }: PlanModalProps) {
     if (form.endDate < form.startDate) { setErr("End date must be after start date."); return false; }
     if (!form.difficulty || form.difficulty < 1 || form.difficulty > 5)
       { setErr("Difficulty must be between 1 and 5."); return false; }
+    if (mode === "create" && picked.some((p) => !p.targetSets || p.targetSets < 1))
+      { setErr("Each exercise needs at least 1 set."); return false; }
     return true;
   };
 
@@ -78,7 +117,13 @@ function PlanModal({ mode, initial, onClose, onSaved }: PlanModalProps) {
       if (mode === "edit" && initial) {
         await updateWorkoutPlan(initial.id, form);
       } else {
-        await createWorkoutPlan(form);
+        const lineItems: CreatePlanExercise[] = picked.map((p) => ({
+          exerciseId: p.exerciseId,
+          targetSets: p.targetSets,
+          targetReps: p.targetReps,
+          dateNumber: p.dateNumber,
+        }));
+        await createWorkoutPlan({ ...form, lineItems });
       }
       onSaved();
     } catch {
@@ -87,6 +132,8 @@ function PlanModal({ mode, initial, onClose, onSaved }: PlanModalProps) {
       setSaving(false);
     }
   };
+
+  const remaining = available.filter((e) => !picked.some((p) => p.exerciseId === e.id));
 
   return (
     <div style={M.overlay} onClick={onClose}>
@@ -131,6 +178,58 @@ function PlanModal({ mode, initial, onClose, onSaved }: PlanModalProps) {
             </button>
           ))}
         </div>
+
+        {/* ── Exercise picker (create mode only) ── */}
+        {mode === "create" && (
+          <>
+            <label style={M.label}>Exercises</label>
+            <div style={M.pickRow}>
+              <select style={M.select} value={toAdd} onChange={(e) => setToAdd(e.target.value)}>
+                <option value="">Select an exercise…</option>
+                {remaining.map((e) => (
+                  <option key={e.id} value={e.id}>{e.name}</option>
+                ))}
+              </select>
+              <button type="button" style={M.addBtn} onClick={addExercise} disabled={!toAdd}>Add</button>
+            </div>
+
+            {picked.length > 0 && (
+              <div style={M.pickedList}>
+                {picked.map((p) => (
+                  <div key={p.exerciseId} style={M.pickedItem}>
+                    <span style={M.pickedName}>{p.exerciseName}</span>
+                    <div style={M.pickedControls}>
+                      <label style={M.miniLabel}>Day</label>
+                      <select
+                        style={M.miniSelect}
+                        value={p.dateNumber}
+                        onChange={(e) => updatePicked(p.exerciseId, "dateNumber", Number(e.target.value))}
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                      <label style={M.miniLabel}>Sets</label>
+                      <input
+                        type="number" min={1} style={M.miniInput}
+                        value={p.targetSets}
+                        onChange={(e) => updatePicked(p.exerciseId, "targetSets", Number(e.target.value))}
+                      />
+                      <label style={M.miniLabel}>Reps</label>
+                      <input
+                        type="number" min={0} style={M.miniInput}
+                        value={p.targetReps}
+                        onChange={(e) => updatePicked(p.exerciseId, "targetReps", Number(e.target.value))}
+                      />
+                      <button type="button" style={M.removeBtn} onClick={() => removePicked(p.exerciseId)}>✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p style={M.hint}>Pick exercises and assign each to a day. The detail page will group them into day tabs. Difficulty is recalculated from the chosen exercises.</p>
+          </>
+        )}
 
         {err && <p style={M.err}>{err}</p>}
 
@@ -180,7 +279,6 @@ export default function WorkoutPlans() {
   const userId                    = getUser()?.id ?? "";
 
   const fetchPlans = () => {
-    if (!userId) { setError("User not found. Please log in again."); setLoading(false); return; }
     setLoading(true); setError(null);
     getUserPlans(userId)
       .then((res) => setPlans(res.data ?? []))
@@ -222,7 +320,6 @@ export default function WorkoutPlans() {
 
   return (
     <div style={S.page}>
-      {/* ── page header ── */}
       <div style={S.headerContainer}>
         <h1 style={S.pageTitle}>Workout plan</h1>
         <hr style={S.divider} />
@@ -235,7 +332,6 @@ export default function WorkoutPlans() {
         </button>
       </div>
 
-      {/* ── loading / error / empty ── */}
       {error   && <p style={S.errorText}>{error}</p>}
       {loading && (
         <div style={S.skeletonWrap}>
@@ -250,7 +346,6 @@ export default function WorkoutPlans() {
         </div>
       )}
 
-      {/* ── plan cards ── */}
       {!loading && plans.length > 0 && (
         <div style={S.list}>
           {plans.map((plan) => {
@@ -262,7 +357,6 @@ export default function WorkoutPlans() {
               <div key={plan.id} style={S.card}>
                 <div style={S.cardBody} onClick={() => navigate(`/workout-plans/${plan.id}`)}>
 
-                  {/* Row 1: Plan Name & Status Badge */}
                   <div style={S.cardTop}>
                     <p style={S.planName}>{plan.planName}</p>
                     <span style={{ ...S.statusBadge, background: status.bg, color: status.color }}>
@@ -270,24 +364,17 @@ export default function WorkoutPlans() {
                     </span>
                   </div>
 
-                  {/* Row 2: Date Range */}
                   <p style={S.dateText}>
                     {fmt(plan.startDate)} – {fmt(plan.endDate)}
                   </p>
 
-                  {/* Row 3: Progress Bar */}
                   <div style={S.progressRow}>
                     <div style={S.barBg}>
-                      <div style={{
-                        ...S.barFill,
-                        width: `${pct}%`,
-                        background: barColor(pct),
-                      }} />
+                      <div style={{ ...S.barFill, width: `${pct}%`, background: barColor(pct) }} />
                     </div>
                     <span style={S.pctText}>{pct}%</span>
                   </div>
 
-                  {/* Row 4: Tags */}
                   <div style={S.tagRow}>
                     {plan.description && (
                       <span style={{ ...S.tag, background: descStyle?.bg, color: descStyle?.color }}>
@@ -302,7 +389,6 @@ export default function WorkoutPlans() {
 
                 </div>
 
-                {/* Actions (Hover/Edit/Delete) */}
                 <div style={S.actions}>
                   <button style={S.editBtn} onClick={(e) => openEdit(e, plan)}>Edit</button>
                   <button style={S.deleteBtn} onClick={(e) => openDelete(e, plan)}>Delete</button>
@@ -322,19 +408,13 @@ export default function WorkoutPlans() {
 
 // ─── Page styles ──────────────────────────────────────────────────────────────
 const S: Record<string, React.CSSProperties> = {
-  page: {
-    padding: "24px 32px", background: "#fbfbfe", minHeight: "100%",
-    fontFamily: "'DM Sans', 'Inter', sans-serif", color: "#111827", maxWidth: 800
-  },
+  page: { padding: "24px 32px", background: "#fbfbfe", minHeight: "100%", fontFamily: "'DM Sans', 'Inter', sans-serif", color: "#111827", maxWidth: 800 },
   headerContainer: { marginBottom: 24 },
   pageTitle: { fontSize: 20, fontWeight: 700, margin: "0 0 16px" },
   divider: { border: "none", borderTop: "1px solid #e5e7eb", margin: 0 },
   topBar: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
   subTitle: { fontSize: 16, fontWeight: 600, color: "#111827" },
-  createBtn: {
-    padding: "6px 14px", background: "#fff", border: "1px solid #d1d5db",
-    borderRadius: 20, fontSize: 13, fontWeight: 500, color: "#374151", cursor: "pointer",
-  },
+  createBtn: { padding: "6px 14px", background: "#fff", border: "1px solid #d1d5db", borderRadius: 20, fontSize: 13, fontWeight: 500, color: "#374151", cursor: "pointer" },
   errorText: { color: "#dc2626", fontSize: 13, marginBottom: 12 },
 
   skeletonWrap: { display: "flex", flexDirection: "column" as const, gap: 16 },
@@ -364,13 +444,13 @@ const S: Record<string, React.CSSProperties> = {
   tag: { fontSize: 11, padding: "4px 10px", borderRadius: 6, background: "#f3f4f6", color: "#4b5563", fontWeight: 500 },
 
   actions: { display: "flex", borderTop: "1px solid #f3f4f6" },
-  editBtn: { flex: 1, padding: "10px", fontSize: 12, fontWeight: 500, background: "#fafafa", border: "none", color: "#6366f1", cursor: "pointer", transition: "background 0.2s" },
-  deleteBtn: { flex: 1, padding: "10px", fontSize: 12, fontWeight: 500, background: "#fafafa", border: "none", borderLeft: "1px solid #f3f4f6", color: "#dc2626", cursor: "pointer", transition: "background 0.2s" },
+  editBtn: { flex: 1, padding: "10px", fontSize: 12, fontWeight: 500, background: "#fafafa", border: "none", color: "#6366f1", cursor: "pointer" },
+  deleteBtn: { flex: 1, padding: "10px", fontSize: 12, fontWeight: 500, background: "#fafafa", border: "none", borderLeft: "1px solid #f3f4f6", color: "#dc2626", cursor: "pointer" },
 };
 
 const M: Record<string, React.CSSProperties> = {
   overlay: { position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 },
-  box: { background: "#fff", borderRadius: 12, padding: "24px", width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" },
+  box: { background: "#fff", borderRadius: 12, padding: "24px", width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto" as const, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
   title: { fontSize: 18, fontWeight: 600, margin: 0, color: "#111827" },
   closeBtn: { background: "none", border: "none", fontSize: 16, color: "#9ca3af", cursor: "pointer", padding: "2px 4px" },
@@ -379,6 +459,21 @@ const M: Record<string, React.CSSProperties> = {
   row: { display: "flex", gap: 16 },
   diffRow: { display: "flex", gap: 8, marginBottom: 20 },
   diffBtn: { flex: 1, padding: "10px 0", fontSize: 14, fontWeight: 600, borderRadius: 8, cursor: "pointer", transition: "all 0.15s" },
+
+  // exercise picker
+  pickRow: { display: "flex", gap: 8, marginBottom: 12 },
+  select: { flex: 1, padding: "10px 12px", fontSize: 14, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", color: "#111827", outline: "none" },
+  addBtn: { padding: "0 16px", fontSize: 14, fontWeight: 500, background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 8, color: "#4338ca", cursor: "pointer" },
+  pickedList: { display: "flex", flexDirection: "column" as const, gap: 8, marginBottom: 10 },
+  pickedItem: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 12px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8 },
+  pickedName: { fontSize: 13, fontWeight: 600, color: "#111827", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const },
+  pickedControls: { display: "flex", alignItems: "center", gap: 6 },
+  miniLabel: { fontSize: 11, color: "#9ca3af" },
+  miniInput: { width: 48, padding: "6px 8px", fontSize: 13, border: "1px solid #d1d5db", borderRadius: 6, textAlign: "center" as const, outline: "none" },
+  miniSelect: { padding: "6px 4px", fontSize: 13, border: "1px solid #d1d5db", borderRadius: 6, outline: "none", background: "#fff" },
+  removeBtn: { width: 26, height: 26, borderRadius: 6, border: "1px solid #fecaca", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontSize: 12 },
+  hint: { fontSize: 12, color: "#9ca3af", margin: "0 0 16px" },
+
   body: { fontSize: 14, color: "#374151", marginBottom: 24, lineHeight: 1.6 },
   err: { fontSize: 13, color: "#dc2626", marginBottom: 12 },
   btnRow: { display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 },

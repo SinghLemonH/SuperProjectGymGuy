@@ -26,6 +26,7 @@ interface LineItemInput {
   target_duration?: number;
   target_weight?: number;
   note?: string;
+  date_number?: number;
 }
 
 interface CreateWorkOutPlanInput {
@@ -68,20 +69,27 @@ export async function listWorkoutPlan({
     // search element
     const searchParam = `%${search}%`;
 
-    // retrieve data
+    // retrieve data  (now includes wp.id + the exercise count per plan)
     const planResult = await db.execute(sql`
-        SELECT code AS workout_plan_code,
-            plan_name AS workout_plan_name,
+        SELECT wp.id,
+            wp.code AS workout_plan_code,
+            wp.plan_name AS workout_plan_name,
             users.username AS username,
-            difficulty,
-            start_date,
-            end_date,
-            description,
-            completeness
-        FROM workout_plan
-        INNER JOIN users ON users.id = workout_plan.user_id
-        WHERE plan_name ILIKE ${searchParam} OR code ILIKE ${searchParam}
-        ORDER BY ${sql.raw(`${sortColumn} ${sortDirection}`)}
+            wp.difficulty,
+            wp.start_date,
+            wp.end_date,
+            wp.description,
+            wp.completeness,
+            COALESCE(cnt.exercise_count, 0)::int AS exercise_count
+        FROM workout_plan wp
+        INNER JOIN users ON users.id = wp.user_id
+        LEFT JOIN (
+            SELECT workout_plan_id, COUNT(*) AS exercise_count
+            FROM workout_plan_exercise
+            GROUP BY workout_plan_id
+        ) cnt ON cnt.workout_plan_id = wp.id
+        WHERE wp.plan_name ILIKE ${searchParam} OR wp.code ILIKE ${searchParam}
+        ORDER BY ${sql.raw(`wp.${sortColumn} ${sortDirection}`)}
         LIMIT ${Number(limit)} OFFSET ${offset}`);
         const countResult = await db.execute(sql`
       SELECT COUNT(*) as total
@@ -92,7 +100,7 @@ export async function listWorkoutPlan({
   const total = Number(countResult.rows[0].total);
 
     return {
-    data: planResult,
+    data: planResult.rows,   // FIX: return the array of rows, not the pg result object
     total: Number(total),
     page: Number(page),
     limit: Number(limit),
@@ -161,21 +169,28 @@ export async function getWorkoutPlan(idOrCode : string) {
   if (header.rows.length === 0) return null;
 
   const rows = await db.execute(sql`
-    SELECT workout_plan_exercise.id AS workout_plan_exercise_id,
+    SELECT workout_plan_exercise.id AS line_item_id,
+            workout_plan_exercise.exercise_id AS exercise_id,
             e.code AS exercise_code, e.name AS exercise_name,
             e.calorie_rate AS calorie_rate, e.score_based AS score_based,
             e.category AS exercise_category, e.difficulty_level AS exercise_difficulty_level,
-            target_sets, target_duration, target_weight, note
+            target_sets, target_reps, target_duration, target_weight, note, date_number,
+            -- has this line item ever been logged in a session? (drives the "done" checkmark)
+            EXISTS (
+              SELECT 1
+              FROM workout_session_exercise wse
+              WHERE wse.workout_plan_exercise_id = workout_plan_exercise.id
+            ) AS completed
 
     FROM workout_plan_exercise
     INNER JOIN exercise e ON workout_plan_exercise.exercise_id = e.id
     WHERE workout_plan_id = ${id}
-    ORDER BY workout_plan_exercise.id
+    ORDER BY date_number, workout_plan_exercise.id
     `);
 
   return {
     header : header.rows[0],
-    line_items : rows
+    line_items : rows.rows   // FIX: return the array of rows, not the pg result object
   };
 }
 
@@ -223,8 +238,8 @@ export async function createWorkOutPlan(input: CreateWorkOutPlanInput) {
     const lineItems = input.line_items ?? [];
     for (const li of lineItems) {
       await client.query(
-        `INSERT INTO workout_plan_exercise (workout_plan_id, exercise_id, target_sets, target_reps, target_duration, target_weight, note)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO workout_plan_exercise (workout_plan_id, exercise_id, target_sets, target_reps, target_duration, target_weight, note, date_number)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           planId,
           li.exercise_id,
@@ -232,7 +247,8 @@ export async function createWorkOutPlan(input: CreateWorkOutPlanInput) {
           li.target_reps ?? null,
           li.target_duration ?? null,
           li.target_weight ?? null,
-          li.note ?? null
+          li.note ?? null,
+          li.date_number ?? 1
         ]
       );
     }
@@ -303,9 +319,9 @@ export async function updateWorkOutPlan(input: UpdateWorkOutPlanInput) {
 
         for (const li of input.line_items) {
           await client.query(
-            `INSERT INTO workout_plan_exercise (workout_plan_id, exercise_id, target_sets, target_reps, target_duration, target_weight, note)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [id, li.exercise_id, li.target_sets, li.target_reps ?? null, li.target_duration ?? null, li.target_weight ?? null, li.note ?? null]
+            `INSERT INTO workout_plan_exercise (workout_plan_id, exercise_id, target_sets, target_reps, target_duration, target_weight, note, date_number)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [id, li.exercise_id, li.target_sets, li.target_reps ?? null, li.target_duration ?? null, li.target_weight ?? null, li.note ?? null, li.date_number ?? 1]
           );
         }
 

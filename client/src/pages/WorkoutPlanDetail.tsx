@@ -4,9 +4,11 @@ import {
   getWorkoutPlanById,
   updateWorkoutPlan,
   deleteWorkoutPlan,
+  finishWorkoutSession,
   type WorkoutPlan,
   type WorkoutPlanExercise,
 } from "../api/plan.api";
+import { getUser } from "../api/auth";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,8 +44,8 @@ const metaLine = (ex: WorkoutPlanExercise) => {
 };
 
 const DAY_NAMES: Record<number, string> = {
-  1: "Monday", 2: "Tuesday", 3: "Wednesday",
-  4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday",
+  1: "Day 1", 2: "Day 2", 3: "Day 3",
+  4: "Day 4", 5: "Day 5", 6: "Day 6", 7: "Day 7",
 };
 
 // ─── Edit modal ───────────────────────────────────────────────────────────────
@@ -66,8 +68,6 @@ function EditModal({ plan, onClose, onSaved }: {
     if (!form.planName.trim()) { setErr("Plan name is required."); return; }
     setSaving(true); setErr(null);
     try {
-      // Backend returns { success: true } (not the full plan), so we just
-      // notify the parent and let it re-fetch the fresh data.
       await updateWorkoutPlan(plan.id, form);
       onSaved();
     } catch { setErr("Failed to save. Please try again."); }
@@ -121,12 +121,20 @@ export default function WorkoutPlanDetail() {
   const [showEdit, setShowEdit]   = useState(false);
   const [showDel, setShowDel]     = useState(false);
   const [deleting, setDeleting]   = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [toast, setToast]         = useState<string | null>(null);
 
   const load = () => {
     if (!id) return;
     setLoading(true); setError(null);
     getWorkoutPlanById(id)
-      .then((data) => { setPlan(data); setActiveDay(1); setChecked(new Set()); })
+      .then((data) => {
+        setPlan(data);
+        setActiveDay(1);
+        // pre-tick exercises that were already logged in a session
+        const done = new Set((data.exercises ?? []).filter((e) => e.completed).map((e) => e.id));
+        setChecked(done);
+      })
       .catch(() => setError("Workout plan not found."))
       .finally(() => setLoading(false));
   };
@@ -161,6 +169,38 @@ export default function WorkoutPlanDetail() {
     catch { setDeleting(false); setShowDel(false); }
   };
 
+  // ── Finish Session: log the checked exercises of the current day ──
+  const handleFinish = async () => {
+    const user = getUser();
+    if (!user?.id) { setToast("Please log in again."); return; }
+
+    const doneExercises = currentEx.filter((e) => checked.has(e.id));
+    if (doneExercises.length === 0) {
+      setToast("Tick at least one exercise first.");
+      return;
+    }
+
+    setFinishing(true);
+    try {
+      await finishWorkoutSession({
+        userId: user.id,
+        workoutPlanId: plan.id,
+        items: doneExercises.map((e) => ({
+          workoutPlanExerciseId: e.id,    // the line-item id the backend needs
+          reps: e.targetReps ?? undefined,
+          durationSec: e.targetDuration ?? undefined,
+          sets: e.targetSets ?? undefined,
+        })),
+      });
+      setToast("Session saved! 🎉");
+      load();   // refresh: re-derives done state + updates overall completeness
+    } catch {
+      setToast("Failed to save session. Please try again.");
+    } finally {
+      setFinishing(false);
+    }
+  };
+
   return (
     <div style={S.page}>
       <div style={S.nav}>
@@ -191,7 +231,7 @@ export default function WorkoutPlanDetail() {
             <button
               key={d}
               style={activeDay === d ? S.tabActive : S.tabInactive}
-              onClick={() => { setActiveDay(d); setChecked(new Set()); }}
+              onClick={() => setActiveDay(d)}
             >
               {DAY_NAMES[d] ?? `Day ${d}`}
             </button>
@@ -246,8 +286,18 @@ export default function WorkoutPlanDetail() {
         </div>
       )}
 
-      {doneCount > 0 && (
-        <button style={S.finishBtn}>Finish Session</button>
+      {currentEx.length > 0 && (
+        <button
+          style={{ ...S.finishBtn, opacity: doneCount > 0 && !finishing ? 1 : 0.5, cursor: doneCount > 0 && !finishing ? "pointer" : "not-allowed" }}
+          onClick={handleFinish}
+          disabled={doneCount === 0 || finishing}
+        >
+          {finishing ? "Saving..." : `Finish Session${doneCount > 0 ? ` (${doneCount})` : ""}`}
+        </button>
+      )}
+
+      {toast && (
+        <div style={S.toast} onClick={() => setToast(null)}>{toast}</div>
       )}
 
       {showEdit && (
@@ -314,7 +364,9 @@ const S: Record<string, React.CSSProperties> = {
   exNote: { fontSize: 13, color: "#9ca3af", fontStyle: "italic" as const },
   catBadge: { fontSize: 11, padding: "4px 10px", borderRadius: 12, fontWeight: 600, flexShrink: 0, marginTop: 2 },
 
-  finishBtn: { width: "100%", padding: "14px", background: "#111827", color: "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer" },
+  finishBtn: { width: "100%", padding: "14px", background: "#111827", color: "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600 },
+
+  toast: { position: "fixed" as const, bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#111827", color: "#fff", padding: "12px 24px", borderRadius: 10, fontSize: 14, fontWeight: 500, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", cursor: "pointer", zIndex: 60 },
 
   muted: { color: "#6b7280", fontSize: 14, textAlign: "center" as const, marginTop: 40 },
   errorText: { color: "#dc2626", fontSize: 14, textAlign: "center" as const, marginTop: 40 },
