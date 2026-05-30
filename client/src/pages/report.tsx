@@ -349,7 +349,10 @@ function LeaderboardConsistencyTable() {
 // ════════════════════════════════════════════════════════════════════
 function UserBMRTable() {
     const [loading, setLoading] = useState(true)
-    const [data, setData]       = useState<WathitReportsIn>()
+    const [data, setData] = useState<WathitReportsIn>()
+
+    const [userFilter, setUserFilter] = useState('')
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
     useEffect(() => {
         const load = async () => {
@@ -368,9 +371,49 @@ function UserBMRTable() {
 
     if (loading) return <p>Loading...</p>
 
+    const allUsers = [...new Set((data?.data ?? []).map(r => r.username))].sort()
+
+    const filtered = (data?.data ?? []).filter((row) => {
+        if (userFilter && row.username !== userFilter) return false
+        return true
+    })
+
+    const sorted = [...filtered].sort((a, b) => {
+        const diff = Number(a.bmr_kcal_per_day) - Number(b.bmr_kcal_per_day)
+        return sortDir === 'desc' ? -diff : diff
+    })
+
     return (
         <>
-            {data?.data.length === 0 ? <NoResults /> :
+            <FilterBar
+                active={!!userFilter || sortDir !== 'desc'}
+                onClear={() => {
+                    setUserFilter('')
+                    setSortDir('desc')
+                }}
+            >
+                <select
+                    value={userFilter}
+                    onChange={(e) => setUserFilter(e.target.value)}
+                    className={selectCls}
+                >
+                    <option value="">All Users</option>
+                    {allUsers.map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                    ))}
+                </select>
+
+                <select
+                    value={sortDir}
+                    onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')}
+                    className={selectCls}
+                >
+                    <option value="desc">BMR High → Low</option>
+                    <option value="asc">BMR Low → High</option>
+                </select>
+            </FilterBar>
+
+            {sorted.length === 0 ? <NoResults /> :
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b">
@@ -383,7 +426,7 @@ function UserBMRTable() {
                         </tr>
                     </thead>
                     <tbody>
-                        {data?.data.map((row, i) => (
+                        {sorted.map((row, i) => (
                             <tr key={i} className="border-b hover:bg-gray-50">
                                 <td className={tdCls}>{row.username}</td>
                                 <td className={tdCls}>{row.age}</td>
@@ -400,13 +443,15 @@ function UserBMRTable() {
     )
 }
 
-
 // ════════════════════════════════════════════════════════════════════
 // 5. Exercise Calories Burned  (Wathit — no filters)
 // ════════════════════════════════════════════════════════════════════
 function ExerciseCaloriesBurnedTable() {
     const [loading, setLoading] = useState(true)
-    const [data, setData]       = useState<WathitReportsIn>()
+    const [data, setData] = useState<WathitReportsIn>()
+
+    const [userFilter, setUserFilter] = useState('')
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
     useEffect(() => {
         const load = async () => {
@@ -425,9 +470,62 @@ function ExerciseCaloriesBurnedTable() {
 
     if (loading) return <p>Loading...</p>
 
+    const allUsers = [...new Set((data?.data ?? []).map((r) => r.username))].sort()
+
+    const filtered = (data?.data ?? []).filter((row) => {
+        if (userFilter && row.username !== userFilter) return false
+        return true
+    })
+
+    const sorted = [...filtered].sort((a, b) => {
+        const diff =
+            Number(a.exercise_calories_burned) -
+            Number(b.exercise_calories_burned)
+
+        return sortDir === 'desc' ? -diff : diff
+    })
+
     return (
         <>
-            {data?.data.length === 0 ? <NoResults /> :
+            <FilterBar
+                active={!!userFilter || sortDir !== 'desc'}
+                onClear={() => {
+                    setUserFilter('')
+                    setSortDir('desc')
+                }}
+            >
+                <select
+                    value={userFilter}
+                    onChange={(e) => setUserFilter(e.target.value)}
+                    className={selectCls}
+                >
+                    <option value="">All Users</option>
+                    {allUsers.map((u) => (
+                        <option key={u} value={u}>
+                            {u}
+                        </option>
+                    ))}
+                </select>
+
+                <select
+                    value={sortDir}
+                    onChange={(e) =>
+                        setSortDir(e.target.value as 'asc' | 'desc')
+                    }
+                    className={selectCls}
+                >
+                    <option value="desc">
+                        Calories High → Low
+                    </option>
+                    <option value="asc">
+                        Calories Low → High
+                    </option>
+                </select>
+            </FilterBar>
+
+            {sorted.length === 0 ? (
+                <NoResults />
+            ) : (
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b">
@@ -437,16 +535,20 @@ function ExerciseCaloriesBurnedTable() {
                         </tr>
                     </thead>
                     <tbody>
-                        {data?.data.map((row, i) => (
+                        {sorted.map((row, i) => (
                             <tr key={i} className="border-b hover:bg-gray-50">
                                 <td className={tdCls}>{row.username}</td>
                                 <td className={tdCls}>{row.total_session}</td>
-                                <td className={tdCls}>{Number(row.exercise_calories_burned).toLocaleString()}</td>
+                                <td className={tdCls}>
+                                    {Number(
+                                        row.exercise_calories_burned
+                                    ).toLocaleString()}
+                                </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-            }
+            )}
         </>
     )
 }
@@ -457,7 +559,10 @@ function ExerciseCaloriesBurnedTable() {
 // ════════════════════════════════════════════════════════════════════
 function TotalEnergyBurnedTable() {
     const [loading, setLoading] = useState(true)
-    const [data, setData]       = useState<WathitReportsIn>()
+    const [data, setData] = useState<WathitReportsIn>()
+
+    const [userFilter, setUserFilter] = useState('')
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
     useEffect(() => {
         const load = async () => {
@@ -476,9 +581,62 @@ function TotalEnergyBurnedTable() {
 
     if (loading) return <p>Loading...</p>
 
+    const allUsers = [...new Set((data?.data ?? []).map((r) => r.username))].sort()
+
+    const filtered = (data?.data ?? []).filter((row) => {
+        if (userFilter && row.username !== userFilter) return false
+        return true
+    })
+
+    const sorted = [...filtered].sort((a, b) => {
+        const diff =
+            Number(a.total_energy_burned) -
+            Number(b.total_energy_burned)
+
+        return sortDir === 'desc' ? -diff : diff
+    })
+
     return (
         <>
-            {data?.data.length === 0 ? <NoResults /> :
+            <FilterBar
+                active={!!userFilter || sortDir !== 'desc'}
+                onClear={() => {
+                    setUserFilter('')
+                    setSortDir('desc')
+                }}
+            >
+                <select
+                    value={userFilter}
+                    onChange={(e) => setUserFilter(e.target.value)}
+                    className={selectCls}
+                >
+                    <option value="">All Users</option>
+                    {allUsers.map((u) => (
+                        <option key={u} value={u}>
+                            {u}
+                        </option>
+                    ))}
+                </select>
+
+                <select
+                    value={sortDir}
+                    onChange={(e) =>
+                        setSortDir(e.target.value as 'asc' | 'desc')
+                    }
+                    className={selectCls}
+                >
+                    <option value="desc">
+                        Energy High → Low
+                    </option>
+                    <option value="asc">
+                        Energy Low → High
+                    </option>
+                </select>
+            </FilterBar>
+
+            {sorted.length === 0 ? (
+                <NoResults />
+            ) : (
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b">
@@ -489,21 +647,28 @@ function TotalEnergyBurnedTable() {
                         </tr>
                     </thead>
                     <tbody>
-                        {data?.data.map((row, i) => (
+                        {sorted.map((row, i) => (
                             <tr key={i} className="border-b hover:bg-gray-50">
                                 <td className={tdCls}>{row.username}</td>
                                 <td className={tdCls}>{row.bmr}</td>
-                                <td className={tdCls}>{Number(row.exercise_calories).toLocaleString()}</td>
-                                <td className={tdCls}>{Number(row.total_energy_burned).toLocaleString()}</td>
+                                <td className={tdCls}>
+                                    {Number(
+                                        row.exercise_calories
+                                    ).toLocaleString()}
+                                </td>
+                                <td className={tdCls}>
+                                    {Number(
+                                        row.total_energy_burned
+                                    ).toLocaleString()}
+                                </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-            }
+            )}
         </>
     )
 }
-
 
 // ════════════════════════════════════════════════════════════════════
 // 7. Score Exercise Summary  (Kitti — paginated)
