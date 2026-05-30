@@ -198,8 +198,7 @@ export default function WorkoutSessions() {
                   </span>
                 )}
               </div>
-
-              {/* trash icon — only appears when you hover the row */}
+              
               <button
                 onClick={(e) => { e.stopPropagation(); handleDelete(session.id) }}
                 className="flex-shrink-0 ml-1 w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"

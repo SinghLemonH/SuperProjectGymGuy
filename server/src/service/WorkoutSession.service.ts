@@ -272,8 +272,13 @@ export const deleteWorkoutSession = async (id: string) => {
     const workoutPlanId = sessionResult.rows[0].workout_plan_id as string | null;
  
     await db.execute(sql`
-      DELETE FROM workout_session
-      WHERE id = ${id}
+    DELETE FROM workout_session_exercise
+    WHERE workout_session_id = ${id}
+    `);
+
+    await db.execute(sql`
+        DELETE FROM workout_session
+        WHERE id = ${id}
     `);
  
     // trigger update completeness หลังลบ (เฉพาะเมื่อมี plan)
