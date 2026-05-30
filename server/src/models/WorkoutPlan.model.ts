@@ -8,6 +8,7 @@ const lineItemSchema = z.object({
   target_duration: z.coerce.number().int().optional(),
   target_weight: z.coerce.number().int().optional(),
   note: z.string().optional(),
+  date_number: z.coerce.number().int().min(1).max(7).optional(),
 });
 
 export const WorkOutPlanSchema = z.object({
