@@ -11,7 +11,8 @@ interface ExerciseRow {
   exercise_id: string
   actual_set: number | ''
   actual_reps: number | ''
-  actual_duration: number | ''
+  duration_min: number | ''
+  duration_sec: number | ''
 }
 
 // datetime-local input expects "YYYY-MM-DDTHH:mm" in local time
@@ -20,8 +21,20 @@ const toLocalDatetimeValue = (d: Date) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+const toSeconds = (min: number | '', sec: number | '') =>
+  (Number(min) || 0) * 60 + (Number(sec) || 0)
+
 // module-level counter so row IDs stay unique even after rows are removed
 let rowCounter = 1
+
+const emptyRow = (): ExerciseRow => ({
+  rowId: rowCounter++,
+  exercise_id: '',
+  actual_set: '',
+  actual_reps: '',
+  duration_min: '',
+  duration_sec: '',
+})
 
 export default function LogSession() {
   const navigate = useNavigate()
@@ -29,9 +42,7 @@ export default function LogSession() {
 
   const [datetime, setDatetime] = useState(toLocalDatetimeValue(new Date()))
   const [planId, setPlanId] = useState('')
-  const [rows, setRows] = useState<ExerciseRow[]>([
-    { rowId: rowCounter++, exercise_id: '', actual_set: '', actual_reps: '', actual_duration: '' },
-  ])
+  const [rows, setRows] = useState<ExerciseRow[]>([emptyRow()])
 
   const [exercises, setExercises] = useState<ExerciseListItem[]>([])
   const [planExercises, setPlanExercises] = useState<WorkoutPlanExercise[]>([])
@@ -47,7 +58,7 @@ export default function LogSession() {
 
   const handlePlanChange = async (selectedPlanId: string) => {
     setPlanId(selectedPlanId)
-    setRows([{ rowId: rowCounter++, exercise_id: '', actual_set: '', actual_reps: '', actual_duration: '' }])
+    setRows([emptyRow()])
     if (!selectedPlanId) { setPlanExercises([]); return }
     try {
       const plan = await getWorkoutPlanById(selectedPlanId)
@@ -58,10 +69,7 @@ export default function LogSession() {
   }
 
   const addRow = () =>
-    setRows((prev) => [
-      ...prev,
-      { rowId: rowCounter++, exercise_id: '', actual_set: '', actual_reps: '', actual_duration: '' },
-    ])
+    setRows((prev) => [...prev, emptyRow()])
 
   const removeRow = (rowId: number) =>
     setRows((prev) => prev.filter((r) => r.rowId !== rowId))
@@ -80,6 +88,9 @@ export default function LogSession() {
     setErrors((prev) => {
       const next = { ...prev }
       delete next[`row_${rowId}_${field}`]
+      if (field === 'duration_min' || field === 'duration_sec') {
+        delete next[`row_${rowId}_duration`]
+      }
       return next
     })
   }
@@ -90,9 +101,9 @@ export default function LogSession() {
     if (rows.length === 0) e.rows = 'Add at least one exercise.'
     rows.forEach((r) => {
       if (!r.exercise_id) e[`row_${r.rowId}_exercise_id`] = 'Select exercise'
-      if (!r.actual_set || Number(r.actual_set) < 1) e[`row_${r.rowId}_actual_set`] = '> 0'
-      if (!r.actual_reps || Number(r.actual_reps) < 1) e[`row_${r.rowId}_actual_reps`] = '> 0'
-      if (!r.actual_duration || Number(r.actual_duration) < 1) e[`row_${r.rowId}_actual_duration`] = '> 0'
+      if (!r.actual_set    || Number(r.actual_set)    < 1) e[`row_${r.rowId}_actual_set`]  = '> 0'
+      if (!r.actual_reps   || Number(r.actual_reps)   < 1) e[`row_${r.rowId}_actual_reps`] = '> 0'
+      if (r.duration_min === '' && r.duration_sec === '') e[`row_${r.rowId}_duration`] = 'Required'
     })
     setErrors(e)
     return Object.keys(e).length === 0
@@ -110,7 +121,7 @@ export default function LogSession() {
           exercise_id: r.exercise_id,
           actual_set: Number(r.actual_set),
           actual_reps: Number(r.actual_reps),
-          actual_duration: Number(r.actual_duration),
+          actual_duration: toSeconds(r.duration_min, r.duration_sec),
         })),
       }
       await logSession(payload)
@@ -266,34 +277,91 @@ export default function LogSession() {
 
                 {/* bottom row: sets / reps / duration inputs */}
                 <div className="flex gap-2 ml-6">
-                  {(
-                    [
-                      { field: 'actual_set' as const, label: 'Sets', emoji: '🔁' },
-                      { field: 'actual_reps' as const, label: 'Reps', emoji: '↩️' },
-                      { field: 'actual_duration' as const, label: 'Seconds', emoji: '⏱️' },
-                    ] as const
-                  ).map(({ field, label, emoji }) => (
-                    <div key={field} className="flex-1 flex flex-col items-center gap-0.5">
-                      <span className="text-[10px] text-gray-400 font-medium">{emoji} {label}</span>
-                      <input
-                        type="number"
-                        min={1}
-                        value={row[field]}
-                        onChange={(e) => updateRow(row.rowId, field, e.target.value)}
-                        placeholder="0"
-                        className={[
-                          'w-full rounded-lg border bg-white px-2 py-1.5 text-sm text-center text-gray-900 outline-none',
-                          'focus:ring-2 focus:ring-[#534AB7]/25 focus:border-[#534AB7] transition-all duration-150',
-                          errors[`row_${row.rowId}_${field}`] ? 'border-red-400' : 'border-gray-200',
-                        ].join(' ')}
-                      />
-                      {errors[`row_${row.rowId}_${field}`] && (
-                        <span className="text-[10px] text-red-400">
-                          {errors[`row_${row.rowId}_${field}`]}
-                        </span>
-                      )}
+
+                  {/* Sets */}
+                  <div className="flex flex-col items-center gap-0.5" style={{ flex: '0 0 20%' }}>
+                    <span className="text-[10px] text-gray-400 font-medium">🔁 Sets</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={row.actual_set}
+                      onChange={(e) => updateRow(row.rowId, 'actual_set', e.target.value)}
+                      placeholder="0"
+                      className={[
+                        'w-full rounded-lg border bg-white px-2 py-1.5 text-sm text-center text-gray-900 outline-none',
+                        'focus:ring-2 focus:ring-[#534AB7]/25 focus:border-[#534AB7] transition-all duration-150',
+                        errors[`row_${row.rowId}_actual_set`] ? 'border-red-400' : 'border-gray-200',
+                      ].join(' ')}
+                    />
+                    {errors[`row_${row.rowId}_actual_set`] && (
+                      <span className="text-[10px] text-red-400">{errors[`row_${row.rowId}_actual_set`]}</span>
+                    )}
+                  </div>
+
+                  {/* Reps */}
+                  <div className="flex flex-col items-center gap-0.5" style={{ flex: '0 0 20%' }}>
+                    <span className="text-[10px] text-gray-400 font-medium">↩️ Reps</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={row.actual_reps}
+                      onChange={(e) => updateRow(row.rowId, 'actual_reps', e.target.value)}
+                      placeholder="0"
+                      className={[
+                        'w-full rounded-lg border bg-white px-2 py-1.5 text-sm text-center text-gray-900 outline-none',
+                        'focus:ring-2 focus:ring-[#534AB7]/25 focus:border-[#534AB7] transition-all duration-150',
+                        errors[`row_${row.rowId}_actual_reps`] ? 'border-red-400' : 'border-gray-200',
+                      ].join(' ')}
+                    />
+                    {errors[`row_${row.rowId}_actual_reps`] && (
+                      <span className="text-[10px] text-red-400">{errors[`row_${row.rowId}_actual_reps`]}</span>
+                    )}
+                  </div>
+
+                  {/* Duration: min : sec */}
+                  <div className="flex-1 flex flex-col gap-0.5">
+                    <span className="text-[10px] text-gray-400 font-medium text-center">⏱️ Duration</span>
+                    <div className="flex gap-1">
+                      <div className="flex-1 flex flex-col items-center">
+                        <input
+                          type="number"
+                          min={0}
+                          value={row.duration_min}
+                          onChange={(e) => updateRow(row.rowId, 'duration_min', e.target.value)}
+                          placeholder="0"
+                          className={[
+                            'w-full rounded-lg border bg-white px-1 py-1.5 text-sm text-center text-gray-900 outline-none',
+                            'focus:ring-2 focus:ring-[#534AB7]/25 focus:border-[#534AB7] transition-all duration-150',
+                            errors[`row_${row.rowId}_duration`] ? 'border-red-400' : 'border-gray-200',
+                          ].join(' ')}
+                        />
+                        <span className="text-[9px] text-gray-400 mt-0.5">min</span>
+                      </div>
+                      <span className="text-gray-400 text-sm self-center pb-3">:</span>
+                      <div className="flex-1 flex flex-col items-center">
+                        <input
+                          type="number"
+                          min={0}
+                          max={59}
+                          value={row.duration_sec}
+                          onChange={(e) => updateRow(row.rowId, 'duration_sec', e.target.value)}
+                          placeholder="0"
+                          className={[
+                            'w-full rounded-lg border bg-white px-1 py-1.5 text-sm text-center text-gray-900 outline-none',
+                            'focus:ring-2 focus:ring-[#534AB7]/25 focus:border-[#534AB7] transition-all duration-150',
+                            errors[`row_${row.rowId}_duration`] ? 'border-red-400' : 'border-gray-200',
+                          ].join(' ')}
+                        />
+                        <span className="text-[9px] text-gray-400 mt-0.5">sec</span>
+                      </div>
                     </div>
-                  ))}
+                    {errors[`row_${row.rowId}_duration`] && (
+                      <span className="text-[10px] text-red-400 text-center">
+                        {errors[`row_${row.rowId}_duration`]}
+                      </span>
+                    )}
+                  </div>
+
                 </div>
               </div>
             ))}
