@@ -38,6 +38,8 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     res = await makeReq(token)
   }
 
+  if (res.status === 304) return {} as T
+
   const contentType = res.headers.get('content-type')
   const data = contentType?.includes('application/json')
       ? await res.json()

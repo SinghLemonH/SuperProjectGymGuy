@@ -161,7 +161,8 @@ export async function getWorkoutPlan(idOrCode : string) {
   if (header.rows.length === 0) return null;
 
   const rows = await db.execute(sql`
-    SELECT e.code AS exercise_code, e.name AS exercise_name,
+    SELECT workout_plan_exercise.id AS workout_plan_exercise_id,
+            e.code AS exercise_code, e.name AS exercise_name,
             e.calorie_rate AS calorie_rate, e.score_based AS score_based,
             e.category AS exercise_category, e.difficulty_level AS exercise_difficulty_level,
             target_sets, target_duration, target_weight, note

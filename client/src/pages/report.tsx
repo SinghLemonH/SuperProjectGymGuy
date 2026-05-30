@@ -760,11 +760,15 @@ function WorkoutDistributionTable() {
 
 
 // ════════════════════════════════════════════════════════════════════
-// 10. Total Calories Burned  (May — no filters)
+// 10. Total Calories Burned  (Maysa)
 // ════════════════════════════════════════════════════════════════════
 function TotalCaloriesBurnedTable() {
-    const [loading, setLoading] = useState(true)
-    const [data, setData]       = useState<MayReportsIn>()
+    const [loading, setLoading]       = useState(true)
+    const [data, setData]             = useState<MayReportsIn>()
+    const [sortDir, setSortDir]       = useState<'asc' | 'desc'>('desc')
+    const [fromDate, setFromDate]     = useState<string>('')
+    const [toDate, setToDate]         = useState<string>('')
+    const [userFilter, setUserFilter] = useState<string>('')
 
     useEffect(() => {
         const load = async () => {
@@ -783,9 +787,48 @@ function TotalCaloriesBurnedTable() {
 
     if (loading) return <p>Loading...</p>
 
+    const allUsers = [...new Set((data?.data ?? []).map((r) => r.username))].sort()
+
+    const filtered = (data?.data ?? []).filter((row) => {
+        if (userFilter && row.username !== userFilter) return false
+        return true
+    })
+
+    const sorted = [...filtered].sort((a, b) => {
+        const diff = Number(a.total_calories_burned) - Number(b.total_calories_burned)
+        return sortDir === 'desc' ? -diff : diff
+    })
+
+    const isActive = !!(userFilter || fromDate || toDate || sortDir !== 'desc')
+
     return (
         <>
-            {data?.data.length === 0 ? <NoResults /> :
+            <FilterBar
+                active={isActive}
+                onClear={() => { setSortDir('desc'); setFromDate(''); setToDate(''); setUserFilter('') }}
+            >
+                <div className="w-full" />
+                <div className="flex items-center gap-1 text-sm text-gray-600">
+                    <span>From:</span>
+                    <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className={selectCls} />
+                </div>
+                <div className="flex items-center gap-1 text-sm text-gray-600">
+                    <span>To:</span>
+                    <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className={selectCls} />
+                </div>
+                <div className="w-full" />
+                <select value={userFilter} onChange={(e) => setUserFilter(e.target.value)} className={selectCls}>
+                    <option value="">All Users</option>
+                    {allUsers.map((u) => <option key={u} value={u}>{u}</option>)}
+                </select>
+                <div className="w-full" />
+                <select value={sortDir} onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')} className={selectCls}>
+                    <option value="desc">Total Calories (High → Low)</option>
+                    <option value="asc">Total Calories (Low → High)</option>
+                </select>
+            </FilterBar>
+
+            {sorted.length === 0 ? <NoResults /> :
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b">
@@ -795,7 +838,7 @@ function TotalCaloriesBurnedTable() {
                         </tr>
                     </thead>
                     <tbody>
-                        {data?.data.map((row, i) => (
+                        {sorted.map((row, i) => (
                             <tr key={i} className="border-b hover:bg-gray-50">
                                 <td className={tdCls}>{row.username}</td>
                                 <td className={tdCls}>{row.total_sessions}</td>
@@ -811,11 +854,15 @@ function TotalCaloriesBurnedTable() {
 
 
 // ════════════════════════════════════════════════════════════════════
-// 11. Total Workout Sessions  (May — no filters)
+// 11. Total Workout Sessions  (Maysa)
 // ════════════════════════════════════════════════════════════════════
 function TotalWorkoutSessionsTable() {
-    const [loading, setLoading] = useState(true)
-    const [data, setData]       = useState<MayReportsIn>()
+    const [loading, setLoading]       = useState(true)
+    const [data, setData]             = useState<MayReportsIn>()
+    const [sortDir, setSortDir]       = useState<'asc' | 'desc'>('desc')
+    const [fromDate, setFromDate]     = useState<string>('')
+    const [toDate, setToDate]         = useState<string>('')
+    const [userFilter, setUserFilter] = useState<string>('')
 
     useEffect(() => {
         const load = async () => {
@@ -834,9 +881,50 @@ function TotalWorkoutSessionsTable() {
 
     if (loading) return <p>Loading...</p>
 
+    const allUsers = [...new Set((data?.data ?? []).map((r) => r.username))].sort()
+
+    const filtered = (data?.data ?? []).filter((row) => {
+        if (userFilter && row.username !== userFilter) return false
+        if (fromDate && new Date(row.first_session) < new Date(fromDate)) return false
+        if (toDate   && new Date(row.last_session)  > new Date(toDate))   return false
+        return true
+    })
+
+    const sorted = [...filtered].sort((a, b) => {
+        const diff = Number(a.total_sessions) - Number(b.total_sessions)
+        return sortDir === 'desc' ? -diff : diff
+    })
+
+    const isActive = !!(userFilter || fromDate || toDate || sortDir !== 'desc')
+
     return (
         <>
-            {data?.data.length === 0 ? <NoResults /> :
+            <FilterBar
+                active={isActive}
+                onClear={() => { setSortDir('desc'); setFromDate(''); setToDate(''); setUserFilter('') }}
+            >
+                <div className="w-full" />
+                <div className="flex items-center gap-1 text-sm text-gray-600">
+                    <span>From:</span>
+                    <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className={selectCls} />
+                </div>
+                <div className="flex items-center gap-1 text-sm text-gray-600">
+                    <span>To:</span>
+                    <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className={selectCls} />
+                </div>
+                <div className="w-full" />
+                <select value={userFilter} onChange={(e) => setUserFilter(e.target.value)} className={selectCls}>
+                    <option value="">All Users</option>
+                    {allUsers.map((u) => <option key={u} value={u}>{u}</option>)}
+                </select>
+                <div className="w-full" />
+                <select value={sortDir} onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')} className={selectCls}>
+                    <option value="desc">Total Sessions (High → Low)</option>
+                    <option value="asc">Total Sessions (Low → High)</option>
+                </select>
+            </FilterBar>
+
+            {sorted.length === 0 ? <NoResults /> :
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b">
@@ -847,7 +935,7 @@ function TotalWorkoutSessionsTable() {
                         </tr>
                     </thead>
                     <tbody>
-                        {data?.data.map((row, i) => (
+                        {sorted.map((row, i) => (
                             <tr key={i} className="border-b hover:bg-gray-50">
                                 <td className={tdCls}>{row.username}</td>
                                 <td className={tdCls}>{row.total_sessions}</td>
@@ -862,13 +950,17 @@ function TotalWorkoutSessionsTable() {
     )
 }
 
-
 // ════════════════════════════════════════════════════════════════════
-// 12. Plan Achievement  (May — no filters)
+// 12. Plan Achievement  (Maysa)
 // ════════════════════════════════════════════════════════════════════
 function PlanAchievementTable() {
-    const [loading, setLoading] = useState(true)
-    const [data, setData]       = useState<MayReportsIn>()
+    const [loading, setLoading]           = useState(true)
+    const [data, setData]                 = useState<MayReportsIn>()
+    const [sortDir, setSortDir]           = useState<'asc' | 'desc'>('desc')
+    const [fromDate, setFromDate]         = useState<string>('')
+    const [toDate, setToDate]             = useState<string>('')
+    const [userFilter, setUserFilter]     = useState<string>('')
+    const [planFilter, setPlanFilter]     = useState<string>('')
 
     useEffect(() => {
         const load = async () => {
@@ -887,9 +979,57 @@ function PlanAchievementTable() {
 
     if (loading) return <p>Loading...</p>
 
+    const allUsers = [...new Set((data?.data ?? []).map((r) => r.username))].sort()
+    const allPlans = [...new Set((data?.data ?? []).map((r) => r.plan_name))].sort()
+
+    const filtered = (data?.data ?? []).filter((row) => {
+        if (userFilter && row.username  !== userFilter) return false
+        if (planFilter && row.plan_name !== planFilter) return false
+        return true
+    })
+
+    const sorted = [...filtered].sort((a, b) => {
+        const aVal = parseFloat(String(a.achievement_percentage).replace('%', ''))
+        const bVal = parseFloat(String(b.achievement_percentage).replace('%', ''))
+        const diff = aVal - bVal
+        return sortDir === 'desc' ? -diff : diff
+    })
+
+    const isActive = !!(userFilter || planFilter || fromDate || toDate || sortDir !== 'desc')
+
     return (
         <>
-            {data?.data.length === 0 ? <NoResults /> :
+            <FilterBar
+                active={isActive}
+                onClear={() => { setSortDir('desc'); setFromDate(''); setToDate(''); setUserFilter(''); setPlanFilter('') }}
+            >
+                <div className="w-full" />
+                <div className="flex items-center gap-1 text-sm text-gray-00">
+                    <span>From:</span>
+                    <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className={selectCls} />
+                </div>
+                <div className="flex items-center gap-1 text-sm text-gray-600">
+                    <span>To:</span>
+                    <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className={selectCls} />
+                </div>
+                <div className="w-full" />
+                <select value={userFilter} onChange={(e) => setUserFilter(e.target.value)} className={selectCls}>
+                    <option value="">All Users</option>
+                    {allUsers.map((u) => <option key={u} value={u}>{u}</option>)}
+                </select>
+                <div className="w-full" />
+                <select value={planFilter} onChange={(e) => setPlanFilter(e.target.value)} className={selectCls}>
+                    <option value="">All Plans</option>
+                    {allPlans.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <div className="w-full" />
+                <select value={sortDir} onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')} className={selectCls}>
+                    <option value="desc">Achievement % (High → Low)</option>
+                    <option value="asc">Achievement % (Low → High)</option>
+                </select>
+            </FilterBar>
+
+            {sorted.length === 0 ? <NoResults /> :
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b">
@@ -901,7 +1041,7 @@ function PlanAchievementTable() {
                         </tr>
                     </thead>
                     <tbody>
-                        {data?.data.map((row, i) => (
+                        {sorted.map((row, i) => (
                             <tr key={i} className="border-b hover:bg-gray-50">
                                 <td className={tdCls}>{row.username}</td>
                                 <td className={tdCls}>{row.plan_name}</td>
@@ -916,6 +1056,7 @@ function PlanAchievementTable() {
         </>
     )
 }
+
 
 
 // ════════════════════════════════════════════════════════════════════

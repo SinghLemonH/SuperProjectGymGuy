@@ -2,19 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getUser } from '../api/auth'
 import { logSession } from '../api/workout.api'
-import { getExercises } from '../api/exercise.api'
-import { getUserPlans } from '../api/plan.api'
+import { getExercises, type ExerciseListItem } from '../api/exercise.api'
+import { getUserPlans, getWorkoutPlanById, type WorkoutPlan, type WorkoutPlanExercise } from '../api/plan.api'
 import { Button, Input } from '@/components/ui'
-
-interface Exercise {
-  id: string
-  name: string
-}
-
-interface Plan {
-  id: string
-  name: string
-}
 
 interface ExerciseRow {
   rowId: number
@@ -43,15 +33,29 @@ export default function LogSession() {
     { rowId: rowCounter++, exercise_id: '', actual_set: '', actual_reps: '', actual_duration: '' },
   ])
 
-  const [exercises, setExercises] = useState<Exercise[]>([])
-  const [plans, setPlans] = useState<Plan[]>([])
+  const [exercises, setExercises] = useState<ExerciseListItem[]>([])
+  const [planExercises, setPlanExercises] = useState<WorkoutPlanExercise[]>([])
+  const [plans, setPlans] = useState<WorkoutPlan[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+ 
 
   useEffect(() => {
-    getExercises().then(setExercises).catch(() => {})
-    if (user?.id) getUserPlans(user.id).then(setPlans).catch(() => {})
-  }, [])
+    getExercises().then((res) => setExercises(res.data)).catch(() => {})
+    if (user?.id) getUserPlans(user.id).then((res) => setPlans(res.data)).catch(() => {})
+  }, [user?.id])
+
+  const handlePlanChange = async (selectedPlanId: string) => {
+    setPlanId(selectedPlanId)
+    setRows([{ rowId: rowCounter++, exercise_id: '', actual_set: '', actual_reps: '', actual_duration: '' }])
+    if (!selectedPlanId) { setPlanExercises([]); return }
+    try {
+      const plan = await getWorkoutPlanById(selectedPlanId)
+      setPlanExercises(plan.exercises ?? [])
+    } catch {
+      setPlanExercises([])
+    }
+  }
 
   const addRow = () =>
     setRows((prev) => [
@@ -101,7 +105,7 @@ export default function LogSession() {
       const payload = {
         user_id: user!.id,
         session_datetime: new Date(datetime).toISOString(),
-        ...(planId ? { workout_plan_id: planId } : {}),// omit the key entirely if no plan selected
+        workout_plan_id: planId || undefined,
         exercises: rows.map((r) => ({
           exercise_id: r.exercise_id,
           actual_set: Number(r.actual_set),
@@ -168,7 +172,7 @@ export default function LogSession() {
           </label>
           <select
             value={planId}
-            onChange={(e) => setPlanId(e.target.value)}
+            onChange={(e) => handlePlanChange(e.target.value)}
             className={[
               'w-full rounded-xl border border-gray-200 hover:border-gray-300 px-3 py-2 text-sm',
               'text-gray-900 bg-white outline-none appearance-none cursor-pointer',
@@ -182,8 +186,8 @@ export default function LogSession() {
             }}
           >
             <option value="">— No plan —</option>
-            {plans.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+           {plans.map((p) => (
+              <option key={p.id} value={p.id}>{p.planName}</option>
             ))}
           </select>
         </div>
@@ -239,8 +243,10 @@ export default function LogSession() {
                     }}
                   >
                     <option value="">Select exercise…</option>
-                    {exercises.map((ex) => (
-                      <option key={ex.id} value={ex.id}>{ex.name}</option>
+                    {(planId ? planExercises : exercises).map((ex) => (
+                      <option key={ex.id} value={planId ? (ex as WorkoutPlanExercise).exerciseId : ex.id}>
+                        {planId ? (ex as WorkoutPlanExercise).exerciseName : (ex as ExerciseListItem).name}
+                      </option>
                     ))}
                   </select>
 

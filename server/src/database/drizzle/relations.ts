@@ -1,5 +1,27 @@
 import { relations } from "drizzle-orm/relations";
-import { users, workoutSession, workoutPlan, userCaution, workoutPlanExercise, workoutSessionExercise, exercise, exerciseMuscleAff } from "./schema";
+import { users, workoutPlan, userCaution, workoutSession, exercise, workoutSessionExercise, workoutPlanExercise, exerciseMuscleAff } from "./schema";
+
+export const workoutPlanRelations = relations(workoutPlan, ({one, many}) => ({
+	user: one(users, {
+		fields: [workoutPlan.userId],
+		references: [users.id]
+	}),
+	workoutSessions: many(workoutSession),
+	workoutPlanExercises: many(workoutPlanExercise),
+}));
+
+export const usersRelations = relations(users, ({many}) => ({
+	workoutPlans: many(workoutPlan),
+	userCautions: many(userCaution),
+	workoutSessions: many(workoutSession),
+}));
+
+export const userCautionRelations = relations(userCaution, ({one}) => ({
+	user: one(users, {
+		fields: [userCaution.userId],
+		references: [users.id]
+	}),
+}));
 
 export const workoutSessionRelations = relations(workoutSession, ({one, many}) => ({
 	user: one(users, {
@@ -13,29 +35,11 @@ export const workoutSessionRelations = relations(workoutSession, ({one, many}) =
 	workoutSessionExercises: many(workoutSessionExercise),
 }));
 
-export const usersRelations = relations(users, ({many}) => ({
-	workoutSessions: many(workoutSession),
-	workoutPlans: many(workoutPlan),
-	userCautions: many(userCaution),
-}));
-
-export const workoutPlanRelations = relations(workoutPlan, ({one, many}) => ({
-	workoutSessions: many(workoutSession),
-	user: one(users, {
-		fields: [workoutPlan.userId],
-		references: [users.id]
-	}),
-	workoutPlanExercises: many(workoutPlanExercise),
-}));
-
-export const userCautionRelations = relations(userCaution, ({one}) => ({
-	user: one(users, {
-		fields: [userCaution.userId],
-		references: [users.id]
-	}),
-}));
-
 export const workoutSessionExerciseRelations = relations(workoutSessionExercise, ({one}) => ({
+	exercise: one(exercise, {
+		fields: [workoutSessionExercise.exerciseId],
+		references: [exercise.id]
+	}),
 	workoutPlanExercise: one(workoutPlanExercise, {
 		fields: [workoutSessionExercise.workoutPlanExerciseId],
 		references: [workoutPlanExercise.id]
@@ -44,6 +48,12 @@ export const workoutSessionExerciseRelations = relations(workoutSessionExercise,
 		fields: [workoutSessionExercise.workoutSessionId],
 		references: [workoutSession.id]
 	}),
+}));
+
+export const exerciseRelations = relations(exercise, ({many}) => ({
+	workoutSessionExercises: many(workoutSessionExercise),
+	exerciseMuscleAffs: many(exerciseMuscleAff),
+	workoutPlanExercises: many(workoutPlanExercise),
 }));
 
 export const workoutPlanExerciseRelations = relations(workoutPlanExercise, ({one, many}) => ({
@@ -63,9 +73,4 @@ export const exerciseMuscleAffRelations = relations(exerciseMuscleAff, ({one}) =
 		fields: [exerciseMuscleAff.exerciseId],
 		references: [exercise.id]
 	}),
-}));
-
-export const exerciseRelations = relations(exercise, ({many}) => ({
-	exerciseMuscleAffs: many(exerciseMuscleAff),
-	workoutPlanExercises: many(workoutPlanExercise),
 }));
