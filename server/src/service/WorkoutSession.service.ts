@@ -26,13 +26,40 @@ const updatePlanCompleteness = async (workoutPlanId: string) => {
 export const getWorkoutSessionsByUserId = async (userId: string) => {
   try {
     const result = await db.execute(sql`
-      SELECT *
-      FROM workout_session
-      WHERE user_id = ${userId}
-      ORDER BY session_datetime DESC
+      SELECT
+        ws.id,
+        ws.session_no        AS session_number,
+        ws.session_datetime,
+        wp.id                AS workout_plan_id,
+        wp.plan_name         AS workout_plan_name,
+        COALESCE(SUM(
+          e.calorie_rate * wse.actual_set * wse.actual_reps * wse.actual_duration
+        ), 0) AS total_calories,
+        COALESCE(SUM(
+          e.score_based * wse.actual_set * wse.actual_reps
+        ), 0) AS total_points,
+        JSON_AGG(
+          JSON_BUILD_OBJECT('exercise_id', e.id, 'name', e.name)
+        ) FILTER (WHERE e.id IS NOT NULL) AS exercises
+      FROM workout_session ws
+      LEFT JOIN workout_plan wp
+        ON wp.id = ws.workout_plan_id
+      LEFT JOIN workout_session_exercise wse
+        ON wse.workout_session_id = ws.id
+      LEFT JOIN exercise e
+        ON e.id = wse.exercise_id
+      WHERE ws.user_id = ${userId}
+      GROUP BY ws.id, ws.session_no, ws.session_datetime, wp.id, wp.plan_name
+      ORDER BY ws.session_datetime DESC
     `);
- 
-    return result.rows;
+
+    return result.rows.map((r: any) => ({
+      ...r,
+      workout_plan: r.workout_plan_id
+        ? { id: r.workout_plan_id, name: r.workout_plan_name }
+        : undefined,
+      exercises: r.exercises ?? [],
+    }));
   } catch {
     throw {
       status: 500,
@@ -45,9 +72,38 @@ export const getWorkoutSessionsByUserId = async (userId: string) => {
 export const getWorkoutSessionById = async (id: string) => {
   try {
     const result = await db.execute(sql`
-      SELECT *
-      FROM workout_session
-      WHERE id = ${id}
+      SELECT
+        ws.id,
+        ws.session_no        AS session_number,
+        ws.session_datetime,
+        wp.id                AS workout_plan_id,
+        wp.plan_name         AS workout_plan_name,
+        COALESCE(SUM(
+          e.calorie_rate * wse.actual_set * wse.actual_reps * wse.actual_duration
+        ), 0) AS total_calories,
+        COALESCE(SUM(
+          e.score_based * wse.actual_set * wse.actual_reps
+        ), 0) AS total_points,
+        JSON_AGG(
+          JSON_BUILD_OBJECT(
+            'exercise_id',     e.id,
+            'name',            e.name,
+            'actual_set',      wse.actual_set,
+            'actual_reps',     wse.actual_reps,
+            'actual_duration', wse.actual_duration,
+            'calories',        ROUND((e.calorie_rate * wse.actual_set
+                                 * wse.actual_reps * wse.actual_duration)::numeric, 0)
+          )
+        ) FILTER (WHERE e.id IS NOT NULL) AS exercises
+      FROM workout_session ws
+      LEFT JOIN workout_plan wp
+        ON wp.id = ws.workout_plan_id
+      LEFT JOIN workout_session_exercise wse
+        ON wse.workout_session_id = ws.id
+      LEFT JOIN exercise e
+        ON e.id = wse.exercise_id
+      WHERE ws.id = ${id}
+      GROUP BY ws.id, ws.session_no, ws.session_datetime, wp.id, wp.plan_name
       LIMIT 1
     `);
  
@@ -59,7 +115,14 @@ export const getWorkoutSessionById = async (id: string) => {
       };
     }
  
-    return result.rows[0];
+    const r: any = result.rows[0];
+    return {
+      ...r,
+      workout_plan: r.workout_plan_id
+        ? { id: r.workout_plan_id, name: r.workout_plan_name }
+        : undefined,
+      exercises: r.exercises ?? [],
+    };
   } catch (error) {
     throw error;
   }
@@ -79,14 +142,14 @@ export const createWorkoutSession = async (
  
     const nextNo = sessionNoResult.rows[0].next_no;
  
-    // สร้าง workout_session
+    // สร้าง workout_session (workout_plan_id เป็น optional)
     const sessionResult = await db.execute(sql`
       INSERT INTO workout_session
         (session_no, user_id, workout_plan_id, session_datetime)
       VALUES (
         ${nextNo},
         ${input.user_id},
-        ${input.workout_plan_id},
+        ${input.workout_plan_id ?? null},
         ${input.session_datetime}
       )
       RETURNING *
@@ -94,24 +157,28 @@ export const createWorkoutSession = async (
  
     const session = sessionResult.rows[0];
  
-    // INSERT workout_session_exercise แต่ละตัว
+    // INSERT workout_session_exercise แต่ละตัว พร้อม actual_set/reps/duration
     const exerciseRows = await Promise.all(
       input.exercises.map((ex) =>
         db.execute(sql`
           INSERT INTO workout_session_exercise
-            (workout_session_id, workout_plan_exercise_id, notes)
+            (workout_session_id, exercise_id, actual_set, actual_reps, actual_duration)
           VALUES (
             ${session.id},
-            ${ex.workout_plan_exercise_id},
-            ${ex.notes ?? null}
+            ${ex.exercise_id},
+            ${ex.actual_set},
+            ${ex.actual_reps},
+            ${ex.actual_duration}
           )
           RETURNING *
         `)
       )
     );
  
-    // update completeness ของ plan
-    await updatePlanCompleteness(input.workout_plan_id);
+    // update completeness ของ plan (เฉพาะเมื่อมี plan)
+    if (input.workout_plan_id) {
+      await updatePlanCompleteness(input.workout_plan_id);
+    }
  
     return {
       ...session,
@@ -161,18 +228,22 @@ export const updateWorkoutSession = async (
         input.exercises.map((ex) =>
           db.execute(sql`
             INSERT INTO workout_session_exercise
-              (workout_session_id, workout_plan_exercise_id, notes)
+              (workout_session_id, exercise_id, actual_set, actual_reps, actual_duration)
             VALUES (
               ${id},
-              ${ex.workout_plan_exercise_id},
-              ${ex.notes ?? null}
+              ${ex.exercise_id},
+              ${ex.actual_set},
+              ${ex.actual_reps},
+              ${ex.actual_duration}
             )
             RETURNING *
           `)
         )
       );
  
-      await updatePlanCompleteness(session.workout_plan_id);
+      if (session.workout_plan_id) {
+        await updatePlanCompleteness(session.workout_plan_id);
+      }
     }
  
     return session;
@@ -198,15 +269,17 @@ export const deleteWorkoutSession = async (id: string) => {
       };
     }
  
-    const workoutPlanId = sessionResult.rows[0].workout_plan_id as string;
+    const workoutPlanId = sessionResult.rows[0].workout_plan_id as string | null;
  
     await db.execute(sql`
       DELETE FROM workout_session
       WHERE id = ${id}
     `);
  
-    // trigger update completeness หลังลบ
-    await updatePlanCompleteness(workoutPlanId);
+    // trigger update completeness หลังลบ (เฉพาะเมื่อมี plan)
+    if (workoutPlanId) {
+      await updatePlanCompleteness(workoutPlanId);
+    }
  
     return { message: "Workout session deleted successfully na ja" };
   } catch (error) {
@@ -218,13 +291,20 @@ export const getAllSessionsCalories = async () => {
   try {
     const result = await db.execute(sql`
       SELECT
-        user_id,
-        id AS session_id,
-        session_no,
-        session_datetime,
-        total_calories
-      FROM workout_session
-      ORDER BY session_datetime DESC
+        ws.user_id,
+        ws.id AS session_id,
+        ws.session_no,
+        ws.session_datetime,
+        COALESCE(SUM(
+          e.calorie_rate * wse.actual_set * wse.actual_reps * wse.actual_duration
+        ), 0) AS total_calories
+      FROM workout_session ws
+      LEFT JOIN workout_session_exercise wse
+        ON wse.workout_session_id = ws.id
+      LEFT JOIN exercise e
+        ON e.id = wse.exercise_id
+      GROUP BY ws.user_id, ws.id, ws.session_no, ws.session_datetime
+      ORDER BY ws.session_datetime DESC
     `);
 
     return result.rows;
@@ -235,4 +315,4 @@ export const getAllSessionsCalories = async () => {
       message: "Cannot fetch sessions calories",
     };
   }
-}
+};

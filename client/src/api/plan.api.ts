@@ -18,6 +18,7 @@ import { apiFetch } from "./fetchWithAuth";
 
 export interface WorkoutPlanExercise {
   id: string;                      // synthesized (backend has no per-row id in detail)
+  exerciseId: string;              // UUID ของ exercise จริงๆ สำหรับส่ง backend
   exerciseName: string;
   category?: string;
   targetSets: number | null;
@@ -79,6 +80,7 @@ interface RawDetailHeader {
 }
 
 interface RawLineItem {
+  exercise_id: string;
   exercise_code: string;
   exercise_name: string;
   exercise_category: string | null;
@@ -116,6 +118,7 @@ const mapListPlan = (r: RawListPlan): WorkoutPlan => ({
 
 const mapLineItem = (li: RawLineItem, i: number): WorkoutPlanExercise => ({
   id: `${li.exercise_code ?? "ex"}-${i}`,
+  exerciseId: li.exercise_id,
   exerciseName: li.exercise_name,
   category: li.exercise_category ?? undefined,
   targetSets: li.target_sets ?? null,
@@ -142,6 +145,7 @@ export const getUserPlans = async (userId: string): Promise<WorkoutPlanListRespo
 /** Single plan + exercises. `idOrCode` is the plan uuid (from the list) or its code. */
 export const getWorkoutPlanById = async (idOrCode: string): Promise<WorkoutPlan> => {
   const res = await apiFetch<RawDetailResponse>(`/${idOrCode}`);
+  console.log('line_items:', res.line_items)
   const h = res.header;
   const exercises = (res.line_items ?? []).map(mapLineItem);
   return {
