@@ -28,8 +28,9 @@ const formatDateTime = (iso: string) => {
 const getExerciseNames = (exercises: Exercise[]) =>
   exercises.map((e) => e.name).join(', ')
 
-// Top 3 get medals, everyone else just gets a flexing arm
-const rankEmoji = (index: number) => {
+// Top 3 get medals, newest session gets 🆕, everyone else just gets a flexing arm
+const rankEmoji = (index: number, sessionId: string, newSessionId: string | null) => {
+  if (sessionId === newSessionId) return '🆕'
   if (index === 0) return '🥇'
   if (index === 1) return '🥈'
   if (index === 2) return '🥉'
@@ -40,6 +41,7 @@ export default function WorkoutSessions() {
   const navigate = useNavigate()
   const user = getUser()
   const [sessions, setSessions] = useState<Session[]>([])
+  const [newSessionId, setNewSessionId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -48,6 +50,8 @@ export default function WorkoutSessions() {
     try {
       const data = await getUserSessions(user.id)
       setSessions(data)
+      // session แรกสุด (index 0 = datetime DESC) = ใหม่สุดเสมอ
+      setNewSessionId(data[0]?.id ?? null)
     } catch {
       setError('Failed to load sessions.')
     } finally {
@@ -62,11 +66,21 @@ export default function WorkoutSessions() {
     try {
       await deleteSession(id)
       // remove it from the list immediately so the UI feels snappy
-      setSessions((prev) => prev.filter((s) => s.id !== id))
+      setSessions((prev) => {
+        const next = prev.filter((s) => s.id !== id)
+        // ถ้าลบ session ที่เป็น new ออก ให้ชี้ไปที่อันใหม่ถัดไปแทน
+        if (id === newSessionId) setNewSessionId(next[0]?.id ?? null)
+        return next
+      })
     } catch {
       alert('Failed to delete. Please try again.')
     }
   }
+
+  // sort by total_points descending for ranking display
+  const sortedSessions = [...sessions].sort(
+    (a, b) => (b.total_points ?? 0) - (a.total_points ?? 0)
+  )
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
@@ -138,10 +152,10 @@ export default function WorkoutSessions() {
         </div>
       )}
 
-      {/* the actual list */}
+      {/* the actual list — sorted by points for ranking */}
       {!loading && !error && sessions.length > 0 && (
         <div className="flex flex-col gap-0 border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
-          {sessions.map((session, index) => (
+          {sortedSessions.map((session, index) => (
             <div
               key={session.id}
               className={`flex items-center gap-3 px-4 py-4 hover:bg-gray-50 transition-colors cursor-pointer group ${
@@ -149,9 +163,9 @@ export default function WorkoutSessions() {
               }`}
               onClick={() => navigate(`/sessions/${session.id}`)}
             >
-              {/* medal or muscle emoji based on rank */}
+              {/* medal, 🆕, or muscle emoji based on rank */}
               <div className="w-8 h-8 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0 text-base">
-                {rankEmoji(index)}
+                {rankEmoji(index, session.id, newSessionId)}
               </div>
 
               {/* session name, plan badge, and datetime + exercises */}
