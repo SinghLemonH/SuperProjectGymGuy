@@ -23,7 +23,7 @@ import WorkoutPlanDetail from './pages/WorkoutPlanDetail'
 // Aphichaya
 import WorkoutSessions   from './pages/WorkoutSessions'
 import SessionDetail     from './pages/SessionDetail'
-//import LogSession        from './pages/LogSession'
+import LogSession        from './pages/LogSession'
 
 export default function App() {
   return (
@@ -54,7 +54,7 @@ export default function App() {
 
             {/* Aphichaya */}
             <Route path="/sessions"           element={<WorkoutSessions />} />
-            {/* <Route path="/sessions/log"       element={<LogSession />} /> */}
+            <Route path="/sessions/log"       element={<LogSession />} /> 
             <Route path="/sessions/:id"       element={<SessionDetail />} />
 
           </Route>

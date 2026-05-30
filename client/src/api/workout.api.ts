@@ -33,10 +33,12 @@ export interface SessionDetailResponse {
   workout_plan?: { id: string; name: string }
 }
 
-export const getUserSessions = (userId: string) =>
-  apiFetch(`/users/${userId}/workout-sessions`)
+export const getUserSessions = async (userId: string): Promise<any[]> => {
+  const res = await apiFetch<{ data: any[] }>(`/users/${userId}/workout-sessions`)
+  return res.data ?? []
+}
 
-export const getSessionById = (id: string) =>
+export const getSessionById = (id: string): Promise<SessionDetailResponse> =>
   apiFetch(`/workout-sessions/${id}`)
 
 export const logSession = (payload: LogSessionPayload) =>

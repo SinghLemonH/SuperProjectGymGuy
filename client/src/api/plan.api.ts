@@ -170,6 +170,7 @@ export const getUserPlans = async (_userId?: string): Promise<WorkoutPlanListRes
 /** Single plan + exercises. `idOrCode` is the plan uuid (from the list) or its code. */
 export const getWorkoutPlanById = async (idOrCode: string): Promise<WorkoutPlan> => {
   const res = await apiFetch<RawDetailResponse>(`/${idOrCode}`);
+  console.log('line_items:', res.line_items)
   const h = res.header;
   const exercises = (res.line_items ?? []).map(mapLineItem);
   return {

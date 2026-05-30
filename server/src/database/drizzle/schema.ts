@@ -1,4 +1,4 @@
-import { pgTable, foreignKey, uuid, smallint, timestamp, unique, text, real, date, numeric, check, pgEnum } from "drizzle-orm/pg-core"
+import { pgTable, foreignKey, unique, uuid, text, real, date, numeric, smallint, timestamp, check, pgView, pgEnum } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const cautionType = pgEnum("caution_type", ['injury', 'chronic_health', 'allergy', 'physical_restriction', 'medication', 'diet'])
@@ -10,25 +10,6 @@ export const scaleText = pgEnum("scale_text", ['low', 'medium', 'high'])
 export const sex = pgEnum("sex", ['male', 'female'])
 export const userLevel = pgEnum("user_level", ['beginner', 'intermediate', 'advanced', 'professional'])
 
-
-export const workoutSession = pgTable("workout_session", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	sessionNo: smallint("session_no").notNull(),
-	userId: uuid("user_id").notNull(),
-	workoutPlanId: uuid("workout_plan_id").notNull(),
-	sessionDatetime: timestamp("session_datetime", { withTimezone: true, mode: 'string' }).notNull(),
-}, (table) => [
-	foreignKey({
-			columns: [table.userId],
-			foreignColumns: [users.id],
-			name: "workout_session_user_id_fkey"
-		}).onUpdate("cascade").onDelete("cascade"),
-	foreignKey({
-			columns: [table.workoutPlanId],
-			foreignColumns: [workoutPlan.id],
-			name: "workout_session_workout_plan_id_fkey"
-		}).onUpdate("cascade").onDelete("cascade"),
-]);
 
 export const workoutPlan = pgTable("workout_plan", {
 	userId: uuid("user_id").notNull(),
@@ -62,6 +43,25 @@ export const userCaution = pgTable("user_caution", {
 		}).onUpdate("cascade").onDelete("cascade"),
 ]);
 
+export const workoutSession = pgTable("workout_session", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	sessionNo: smallint("session_no").notNull(),
+	userId: uuid("user_id").notNull(),
+	workoutPlanId: uuid("workout_plan_id"),
+	sessionDatetime: timestamp("session_datetime", { withTimezone: true, mode: 'string' }).notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "workout_session_user_id_fkey"
+		}).onUpdate("cascade").onDelete("cascade"),
+	foreignKey({
+			columns: [table.workoutPlanId],
+			foreignColumns: [workoutPlan.id],
+			name: "workout_session_workout_plan_id_fkey"
+		}).onUpdate("cascade").onDelete("cascade"),
+]);
+
 export const users = pgTable("users", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	username: text().notNull(),
@@ -85,7 +85,16 @@ export const workoutSessionExercise = pgTable("workout_session_exercise", {
 	notes: text(),
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	workoutPlanExerciseId: uuid("workout_plan_exercise_id"),
+	exerciseId: uuid("exercise_id"),
+	actualSet: smallint("actual_set").default(1).notNull(),
+	actualReps: smallint("actual_reps"),
+	actualDuration: smallint("actual_duration"),
 }, (table) => [
+	foreignKey({
+			columns: [table.exerciseId],
+			foreignColumns: [exercise.id],
+			name: "workout_session_exercise_exercise_id_fkey"
+		}).onUpdate("cascade").onDelete("restrict"),
 	foreignKey({
 			columns: [table.workoutPlanExerciseId],
 			foreignColumns: [workoutPlanExercise.id],
@@ -148,3 +157,11 @@ export const workoutPlanExercise = pgTable("workout_plan_exercise", {
 		}).onUpdate("cascade").onDelete("cascade"),
 	check("Workout_plan_exercise_Target_sets_check", sql`target_sets > 0`),
 ]);
+export const workoutPlanDist = pgView("workout_plan_dist", {	workoutPlanId: uuid("workout_plan_id"),
+	totalScore: real("total_score"),
+}).with({"securityInvoker":"on"}).as(sql`SELECT wpe.workout_plan_id, sum(e.score_based) AS total_score FROM workout_plan_exercise wpe JOIN exercise e ON e.id = wpe.exercise_id JOIN workout_plan wp ON wp.id = wpe.workout_plan_id WHERE wp.user_id = '466258ab-b0ff-4564-973e-a61a772fb2e0'::uuid GROUP BY wpe.workout_plan_id`);
+
+export const exercisePlanView = pgView("exercise_plan_view", {	workoutPlanId: uuid("workout_plan_id"),
+	exerciseId: uuid("exercise_id"),
+	totalScore: real("total_score"),
+}).as(sql`SELECT wp.id AS workout_plan_id, workout_plan_exercise.exercise_id, sum(e.score_based) AS total_score FROM workout_plan_exercise JOIN workout_plan wp ON wp.id = workout_plan_exercise.workout_plan_id JOIN exercise e ON e.id = workout_plan_exercise.exercise_id WHERE wp.user_id = '3adfe963-6552-4d86-a6bf-68ca55f123e9'::uuid GROUP BY wp.id, workout_plan_exercise.exercise_id`);
